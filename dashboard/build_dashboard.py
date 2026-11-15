@@ -1,0 +1,86 @@
+import json
+SEL = "sensor.calorie_tracker_selected_day"
+def tpl_card(name, expr, icon, color):
+    return {"type": "custom:mushroom-template-card", "primary": name, "icon": icon, "icon_color": color,
+            "secondary": "{{ " + expr + " }}", "entity": SEL, "tap_action": {"action": "none"}}
+macros = lambda key, unit: f"(state_attr('{SEL}','totals') or {{}}).get('{key}', 0) | round(0) | int ~ ' {unit}'"
+meal_names = "{'breakfast':'Desayuno','lunch':'Almuerzo','dinner':'Cena','snack':'Snack'}"
+diario = {
+    "title": "Diario", "path": "diario", "icon": "mdi:notebook", "type": "sections", "max_columns": 3,
+    "sections": [
+        {"type": "grid", "cards": [
+            {"type": "heading", "heading": "Día", "heading_style": "title"},
+            {"type": "horizontal-stack", "cards": [
+                {"type": "custom:mushroom-entity-card", "entity": "button.calorie_tracker_previous_day", "_press": "previous_day", "name": "Anterior",
+                 "icon": "mdi:chevron-left", "layout": "vertical", "primary_info": "name", "secondary_info": "none"},
+                {"type": "custom:mushroom-entity-card", "entity": "button.calorie_tracker_today", "_press": "today", "name": "Hoy",
+                 "icon": "mdi:calendar-today", "layout": "vertical", "primary_info": "name", "secondary_info": "none"},
+                {"type": "custom:mushroom-entity-card", "entity": "button.calorie_tracker_next_day", "_press": "next_day", "name": "Siguiente",
+                 "icon": "mdi:chevron-right", "layout": "vertical", "primary_info": "name", "secondary_info": "none"},
+            ]},
+            {"type": "entities", "entities": [{"entity": "date.calorie_tracker_diary_date", "name": "Fecha"}]},
+            {"type": "grid", "columns": 2, "square": False, "cards": [
+                tpl_card("Calorías", f"states('{SEL}') ~ ' kcal'", "mdi:fire", "deep-orange"),
+                tpl_card("Proteína", macros("protein", "g"), "mdi:food-steak", "red"),
+                tpl_card("Carbohidratos", macros("carbohydrates", "g"), "mdi:bread-slice", "amber"),
+                tpl_card("Grasa", macros("fat", "g"), "mdi:oil", "yellow"),
+            ]},
+            {"type": "markdown", "content":
+                "{% set m = state_attr('" + SEL + "','meals') or {} %}{% set n = " + meal_names + " %}"
+                "{% if m %}{% for k in ['breakfast','lunch','dinner','snack'] if k in m %}"
+                "**{{ n[k] }}:** {{ m[k] }} kcal{% if not loop.last %} · {% endif %}{% endfor %}"
+                "{% else %}_Sin registros este día._{% endif %}"},
+        ]},
+        {"type": "grid", "column_span": 2, "cards": [
+            {"type": "heading", "heading": "Comidas del día", "heading_style": "title"},
+            {"type": "custom:flex-table-card", "entities": {"include": SEL}, "sort_by": "order+",
+             "css": {"tbody tr:nth-child(odd)": "background-color: rgba(127,127,127,0.06)"},
+             "columns": [
+                 {"name": "order", "data": "entries", "modify": "({'breakfast':1,'lunch':2,'dinner':3,'snack':4})[x.meal]", "hidden": True},
+                 {"name": "Comida", "data": "entries", "modify": "({'breakfast':'Desayuno','lunch':'Almuerzo','dinner':'Cena','snack':'Snack'})[x.meal]"},
+                 {"name": "Alimento", "data": "entries", "modify": "x.ingredients ? x.name + '<br><small>' + x.ingredients + '</small>' : x.name"},
+                 {"name": "Porción", "data": "entries", "modify": "x.portion"},
+                 {"name": "kcal", "data": "entries", "modify": "x.calories", "align": "right"},
+                 {"name": "P", "data": "entries", "modify": "x.protein", "align": "right"},
+                 {"name": "C", "data": "entries", "modify": "x.carbohydrates", "align": "right"},
+                 {"name": "G", "data": "entries", "modify": "x.fat", "align": "right"},
+             ]},
+            {"type": "custom:apexcharts-card", "header": {"show": True, "title": "Calorías — últimos 60 días", "show_states": True, "colorize_states": True},
+             "graph_span": "60d", "span": {"end": "day"}, "apex_config": {"chart": {"height": 260}, "dataLabels": {"enabled": False}},
+             "series": [{"entity": "sensor.calorie_tracker_daily_average_30_days", "name": "Promedio 30 días", "type": "column", "color": "#ff7043",
+                         "show": {"in_header": "raw"},
+                         "data_generator": "return entity.attributes.days.map(d => [new Date(d.day + 'T12:00:00').getTime(), d.calories]);"}]},
+        ]},
+        {"type": "grid", "cards": [
+            {"type": "heading", "heading": "Hoy", "heading_style": "subtitle"},
+            {"type": "tile", "entity": "sensor.calorie_tracker_calories_today", "name": "Calorías hoy"},
+            {"type": "heading", "heading": "MyFitnessPal", "heading_style": "subtitle"},
+            {"type": "tile", "entity": "sensor.calorie_tracker_myfitnesspal_sync", "name": "Sincronización"},
+            {"type": "tile", "entity": "button.calorie_tracker_sync_myfitnesspal", "name": "Sincronizar ahora"},
+        ]},
+    ],
+}
+recetas = {
+    "title": "Recetas", "path": "recetas", "icon": "mdi:chef-hat", "type": "panel",
+    "cards": [{"type": "custom:flex-table-card", "title": "Recetas y comidas guardadas", "entities": {"include": "sensor.calorie_tracker_recipes_and_meals"},
+               "enable_search": True, "sort_by": "Nombre+",
+               "columns": [
+                   {"name": "Tipo", "data": "items", "modify": "x.kind == 'recipe' ? 'Receta' : 'Comida'"},
+                   {"name": "Nombre", "data": "items", "modify": "x.name"},
+                   {"name": "kcal", "data": "items", "modify": "x.calories", "align": "right"},
+                   {"name": "P", "data": "items", "modify": "x.protein", "align": "right"},
+                   {"name": "C", "data": "items", "modify": "x.carbohydrates", "align": "right"},
+                   {"name": "G", "data": "items", "modify": "x.fat", "align": "right"},
+                   {"name": "Ingredientes", "data": "items", "modify": "x.ingredients.split('; ').join('<br>')"},
+               ]}],
+}
+def fix(o):
+    if isinstance(o, dict):
+        if "_press" in o:
+            b = o.pop("_press")
+            o["tap_action"] = {"action": "perform-action", "perform_action": "button.press", "target": {"entity_id": f"button.calorie_tracker_{b}"}}
+        for v in o.values(): fix(v)
+    elif isinstance(o, list):
+        for v in o: fix(v)
+fix(diario)
+json.dump({"title": "Calorías", "views": [diario, recetas]}, open("dashboard.json", "w"), ensure_ascii=False, indent=1)

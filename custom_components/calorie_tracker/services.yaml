@@ -1,0 +1,57 @@
+search_foods:
+  fields:
+    query: { example: "huevo", selector: { text: } }
+    kind: { selector: { select: { options: [food, recipe, meal] } } }
+    offset: { default: 0, selector: { number: { min: 0, max: 100000, mode: box } } }
+    limit: { default: 10, selector: { number: { min: 1, max: 50 } } }
+get_food:
+  fields:
+    food_id: { required: true, selector: { text: } }
+recommend_foods:
+  fields:
+    calories: { selector: { number: { min: 0, max: 5000, unit_of_measurement: kcal, mode: box } } }
+    protein: { selector: { number: { min: 0, max: 500, unit_of_measurement: g, mode: box } } }
+    carbohydrates: { selector: { number: { min: 0, max: 1000, unit_of_measurement: g, mode: box } } }
+    fat: { selector: { number: { min: 0, max: 500, unit_of_measurement: g, mode: box } } }
+    kind: { selector: { select: { options: [food, recipe, meal] } } }
+    query: { selector: { text: } }
+    limit: { default: 5, selector: { number: { min: 1, max: 20 } } }
+log_food:
+  fields:
+    meal: { required: true, example: cena, selector: { text: } }
+    food_id: { selector: { text: } }
+    servings: { selector: { number: { min: 0.01, max: 100, step: 0.01, mode: box } } }
+    quantity: { selector: { number: { min: 0.01, max: 100000, step: 0.01, mode: box } } }
+    unit: { example: g, selector: { text: } }
+    name: { selector: { text: } }
+    calories: { selector: { number: { min: 0, max: 100000, mode: box } } }
+    protein: { selector: { number: { min: 0, max: 100000, mode: box } } }
+    carbohydrates: { selector: { number: { min: 0, max: 100000, mode: box } } }
+    fat: { selector: { number: { min: 0, max: 100000, mode: box } } }
+    fiber: { selector: { number: { min: 0, max: 100000, mode: box } } }
+    sugar: { selector: { number: { min: 0, max: 100000, mode: box } } }
+    sodium: { selector: { number: { min: 0, max: 100000, mode: box } } }
+    eaten_at: { selector: { datetime: } }
+delete_entries:
+  fields:
+    entry_ids: { required: true, selector: { text: { multiple: true } } }
+get_diary:
+  fields:
+    start: { selector: { date: } }
+    end: { selector: { date: } }
+save_food:
+  fields:
+    name: { required: true, selector: { text: } }
+    brand: { selector: { text: } }
+    serving_amount: { default: 1, selector: { number: { min: 0.001, max: 100000, mode: box } } }
+    serving_unit: { default: serving, selector: { text: } }
+    calories: { required: true, selector: { number: { min: 0, max: 100000, mode: box } } }
+    protein: { selector: { number: { min: 0, max: 100000, mode: box } } }
+    carbohydrates: { selector: { number: { min: 0, max: 100000, mode: box } } }
+    fat: { selector: { number: { min: 0, max: 100000, mode: box } } }
+    fiber: { selector: { number: { min: 0, max: 100000, mode: box } } }
+    sugar: { selector: { number: { min: 0, max: 100000, mode: box } } }
+    sodium: { selector: { number: { min: 0, max: 100000, mode: box } } }
+sync_myfitnesspal:
+  fields:
+    since: { selector: { date: } }

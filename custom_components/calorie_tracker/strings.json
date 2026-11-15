@@ -1,0 +1,263 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Calorie Tracker",
+        "description": "Optional: paste your MyFitnessPal session cookie to import your foods, meals, recipes and diary history. In a browser logged in to myfitnesspal.com open developer tools → Storage/Application → Cookies → https://www.myfitnesspal.com and copy the value of `__Secure-next-auth.session-token`.",
+        "data": {
+          "session_token": "MyFitnessPal session cookie"
+        }
+      },
+      "reauth_confirm": {
+        "title": "MyFitnessPal session expired",
+        "description": "Log in at myfitnesspal.com and paste a new `__Secure-next-auth.session-token` cookie value.",
+        "data": {
+          "session_token": "MyFitnessPal session cookie"
+        }
+      },
+      "reconfigure": {
+        "title": "Update MyFitnessPal cookie",
+        "data": {
+          "session_token": "MyFitnessPal session cookie"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "MyFitnessPal rejected this cookie. Log in again and copy a fresh value.",
+      "cannot_connect": "Could not reach MyFitnessPal."
+    },
+    "abort": {
+      "already_configured": "Already configured",
+      "single_instance_allowed": "Already configured",
+      "reauth_successful": "Cookie updated",
+      "reconfigure_successful": "Cookie updated"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Calorie Tracker options",
+        "data": {
+          "daily_goal": "Daily calorie goal (0 = none)",
+          "sync_time": "Daily MyFitnessPal sync time",
+          "history_start": "Import MyFitnessPal diary history from"
+        }
+      }
+    }
+  },
+  "services": {
+    "search_foods": {
+      "name": "Search foods",
+      "description": "Search the food catalog by name or brand; most used first.",
+      "fields": {
+        "query": {
+          "name": "Query",
+          "description": "Words to match"
+        },
+        "kind": {
+          "name": "Kind",
+          "description": "food, recipe or meal"
+        },
+        "offset": {
+          "name": "Offset",
+          "description": "Pagination offset"
+        },
+        "limit": {
+          "name": "Limit",
+          "description": "Maximum results"
+        }
+      }
+    },
+    "get_food": {
+      "name": "Get food",
+      "description": "All nutrients, serving sizes and ingredients of one food.",
+      "fields": {
+        "food_id": {
+          "name": "Food ID",
+          "description": "ID from search"
+        }
+      }
+    },
+    "recommend_foods": {
+      "name": "Recommend foods",
+      "description": "Suggest registered foods and portions close to any combination of calorie, protein, carbohydrate and fat targets.",
+      "fields": {
+        "calories": {
+          "name": "Calories",
+          "description": "kcal"
+        },
+        "protein": {
+          "name": "Protein",
+          "description": "grams"
+        },
+        "carbohydrates": {
+          "name": "Carbohydrates",
+          "description": "grams"
+        },
+        "fat": {
+          "name": "Fat",
+          "description": "grams"
+        },
+        "kind": {
+          "name": "Kind",
+          "description": "food, recipe or meal"
+        },
+        "query": {
+          "name": "Query",
+          "description": "Only foods matching these words"
+        },
+        "limit": {
+          "name": "Limit",
+          "description": "Number of suggestions"
+        }
+      }
+    },
+    "log_food": {
+      "name": "Log food",
+      "description": "Add food to the diary. Use food_id with servings or quantity+unit, or name with nutrients.",
+      "fields": {
+        "meal": {
+          "name": "Meal",
+          "description": "breakfast/desayuno, lunch/almuerzo, dinner/cena, snack"
+        },
+        "food_id": {
+          "name": "Food ID",
+          "description": "Catalog food"
+        },
+        "servings": {
+          "name": "Servings",
+          "description": "Multiples of the food's serving"
+        },
+        "quantity": {
+          "name": "Quantity",
+          "description": "Amount in unit, e.g. 250"
+        },
+        "unit": {
+          "name": "Unit",
+          "description": "e.g. g, ml, cup"
+        },
+        "name": {
+          "name": "Name",
+          "description": "Name for a food not in the catalog"
+        },
+        "calories": {
+          "name": "Calories",
+          "description": "kcal"
+        },
+        "protein": {
+          "name": "Protein",
+          "description": "grams"
+        },
+        "carbohydrates": {
+          "name": "Carbohydrates",
+          "description": "grams"
+        },
+        "fat": {
+          "name": "Fat",
+          "description": "grams"
+        },
+        "fiber": {
+          "name": "Fiber",
+          "description": "grams"
+        },
+        "sugar": {
+          "name": "Sugar",
+          "description": "grams"
+        },
+        "sodium": {
+          "name": "Sodium",
+          "description": "milligrams"
+        },
+        "eaten_at": {
+          "name": "Eaten at",
+          "description": "Defaults to now"
+        }
+      }
+    },
+    "delete_entries": {
+      "name": "Delete diary entries",
+      "description": "Remove diary entries by ID.",
+      "fields": {
+        "entry_ids": {
+          "name": "Entry IDs",
+          "description": "IDs from get_diary"
+        }
+      }
+    },
+    "get_diary": {
+      "name": "Get diary",
+      "description": "Entries and totals for a day, or per-day totals and averages for a range.",
+      "fields": {
+        "start": {
+          "name": "Start",
+          "description": "Day (default today)"
+        },
+        "end": {
+          "name": "End",
+          "description": "Optional end of range"
+        }
+      }
+    },
+    "save_food": {
+      "name": "Save food",
+      "description": "Add or update a custom food.",
+      "fields": {
+        "name": {
+          "name": "Name",
+          "description": "Food name"
+        },
+        "brand": {
+          "name": "Brand",
+          "description": "Optional"
+        },
+        "serving_amount": {
+          "name": "Serving amount",
+          "description": "e.g. 100"
+        },
+        "serving_unit": {
+          "name": "Serving unit",
+          "description": "e.g. g"
+        },
+        "calories": {
+          "name": "Calories",
+          "description": "kcal"
+        },
+        "protein": {
+          "name": "Protein",
+          "description": "grams"
+        },
+        "carbohydrates": {
+          "name": "Carbohydrates",
+          "description": "grams"
+        },
+        "fat": {
+          "name": "Fat",
+          "description": "grams"
+        },
+        "fiber": {
+          "name": "Fiber",
+          "description": "grams"
+        },
+        "sugar": {
+          "name": "Sugar",
+          "description": "grams"
+        },
+        "sodium": {
+          "name": "Sodium",
+          "description": "milligrams"
+        }
+      }
+    },
+    "sync_myfitnesspal": {
+      "name": "Sync MyFitnessPal",
+      "description": "Import foods, meals, recipes and diary foods from MyFitnessPal.",
+      "fields": {
+        "since": {
+          "name": "Since",
+          "description": "Rescan the diary from this date"
+        }
+      }
+    }
+  },
+  "entity": {}
+}

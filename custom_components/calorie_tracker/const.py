@@ -1,0 +1,10 @@
+DOMAIN = "calorie_tracker"
+CONF_SESSION_TOKEN = "session_token"
+CONF_DAILY_GOAL = "daily_goal"
+CONF_SYNC_TIME = "sync_time"
+CONF_HISTORY_START = "history_start"
+DEFAULT_SYNC_TIME = "04:30"
+DEFAULT_HISTORY_START = "2020-01-01"
+OVERLAP_DAYS = 3
+SIGNAL_UPDATED = f"{DOMAIN}_updated"
+STORAGE_VERSION = 1
