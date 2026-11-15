@@ -20,7 +20,7 @@ TARGET_ALIASES = {"carbs": "carbohydrates", "grasa": "fat", "grasas": "fat", "pr
                   "proteinas": "protein", "calorias": "calories", "carbohidratos": "carbohydrates"}
 KINDS = ("food", "recipe", "meal")
 UNIT_ALIASES = {
-    "g": "g", "gr": "g", "gram": "g", "grams": "g", "gramo": "g", "gramos": "g", "gram(s)": "g",
+    "g": "g", "gr": "g", "grs": "g", "gramm": "g", "gramme": "g", "grammes": "g", "gram": "g", "grams": "g", "gramo": "g", "gramos": "g", "gram(s)": "g",
     "ml": "ml", "milliliter": "ml", "milliliters": "ml", "mililitro": "ml", "mililitros": "ml",
     "kg": "kg", "oz": "oz", "ounce": "oz", "ounces": "oz",
     "serving": "serving", "servings": "serving", "serving(s)": "serving", "porcion": "serving",
@@ -163,7 +163,7 @@ class Catalog:
 
     @staticmethod
     def _within(values: dict, factor: float, limits: dict[str, float]) -> bool:
-        return all(values[k] * factor <= cap + 0.5 for k, cap in limits.items())
+        return all(values[k] * factor <= cap + 0.05 for k, cap in limits.items())  # rounding only
 
     def _pick(self, ranked: list, limit: int, matcher) -> list[dict[str, Any]]:
         ranked.sort(key=lambda r: r[:2])
@@ -203,8 +203,11 @@ class Catalog:
                 if not self._within(values, factor, limits):
                     continue
                 error = sum(abs(values[k] * factor - v) / max(v, floor[k]) for k, v in targets.items()) / len(targets)
-                ranked.append((error, -self._usage(food), food["id"], factor, portion))
-        picks = self._pick(ranked, limit, lambda e: {"match": e <= tolerance, "difference_pct": round(e * 100)})
+                ranked.append((error + self._novelty(food), -self._usage(food), food["id"], factor, portion))
+        picks = self._pick(ranked, limit, lambda e: {})
+        for pick in picks:
+            error = sum(abs((pick["nutrients"].get(k) or 0) - v) / max(v, floor[k]) for k, v in targets.items()) / len(targets)
+            pick.update({"match": error <= tolerance, "difference_pct": round(error * 100)})
         result = {"mode": "targets", "targets": targets, "items": picks,
                   "notice": "Portions are scaled from the saved serving. Log with food_id and servings."}
         if limits:
@@ -234,7 +237,7 @@ class Catalog:
                 used = shares.get("calories", sum(shares.values()) / len(shares))
                 if used < 0.25:
                     continue  # too small to be a meal suggestion
-                score = abs(used - fill) - 0.3 * shares.get("protein", 0)
+                score = abs(used - fill) - 0.3 * shares.get("protein", 0) + self._novelty(food)
                 ranked.append((score, -self._usage(food), food["id"], factor, portion))
         picks = self._pick(ranked, limit, lambda s: {})
         for pick in picks:
@@ -252,14 +255,47 @@ class Catalog:
     def _usage(food: dict[str, Any]) -> int:
         return food.get("uses", 0) * 5 + food.get("mfp_uses", 0)
 
-    @staticmethod
-    def _portions(food: dict[str, Any]) -> list[tuple[float, str]]:
-        """Reasonable portions: halves of the base serving, or 25 g/ml steps for weight-based foods."""
+    def _typical(self, food_id: str) -> float | None:
+        """Median portion (in base servings) the user actually logged for this food."""
+        if getattr(self, "_typical_size", None) != len(self.entries):
+            factors: dict[str, list[float]] = {}
+            for entry in self.entries:
+                food = self.foods.get(entry.get("food_id") or "")
+                logged, base = entry["nutrients"].get("calories"), food and food["nutrients"].get("calories")
+                if food and logged and base:
+                    factors.setdefault(food["id"], []).append(logged / base)
+            self._typical_cache = {k: sorted(v)[len(v) // 2] for k, v in factors.items()}
+            self._typical_size = len(self.entries)
+        return self._typical_cache.get(food_id)
+
+    def _portions(self, food: dict[str, Any]) -> list[tuple[float, str]]:
+        """Realistic portions: around what the user usually eats of this food (½× to 2×).
+
+        Foods never logged fall back to the base serving's multiples, or 25 g steps up to 300 g
+        for weight-based foods.
+        """
         unit, amount = unit_key(food["serving_unit"]), food["serving_amount"]
-        if unit in ("g", "ml") and amount > 0:
-            return [(q / amount, f"{q:g} {food['serving_unit']}") for q in range(25, 501, 25)]
-        base = serving_label(amount, food["serving_unit"])
-        return [(n, f"{n:g} × {base}") for n in (0.5, 1, 1.5, 2, 2.5, 3)]
+        weight = unit in ("g", "ml") and amount > 0
+        typical = self._typical(food["id"])
+        if typical:
+            factors = sorted({round(typical * m, 3) for m in (0.5, 0.75, 1, 1.25, 1.5, 2)})
+        elif weight:
+            factors = [q / amount for q in range(25, 301, 25)]
+        else:
+            factors = [0.5, 1, 1.5, 2]
+        portions = []
+        for factor in factors:
+            if weight:
+                grams = max(round(factor * amount / 5) * 5, 5)
+                portions.append((grams / amount, f"{grams:g} {food['serving_unit']}"))
+            else:
+                count = max(round(factor * 4) / 4, 0.25)  # quarter servings
+                portions.append((count, f"{count:g} × {serving_label(amount, food['serving_unit'])}"))
+        return list(dict.fromkeys(portions))
+
+    def _novelty(self, food: dict[str, Any]) -> float:
+        """Small ranking penalty for foods the user has never eaten."""
+        return 0 if self._usage(food) or self._typical(food["id"]) else 0.1
 
     def food(self, food_id: str) -> dict[str, Any]:
         food = self.foods.get(food_id)

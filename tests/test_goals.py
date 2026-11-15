@@ -41,15 +41,14 @@ class WithinLimitsTest(unittest.TestCase):
         self.assertTrue(result["items"])
         for item in result["items"]:
             for key, cap in limits.items():
-                self.assertLessEqual(item["nutrients"][key], cap + 0.5, (item["name"], key))
+                self.assertLessEqual(item["nutrients"][key], cap + 0.05, (item["name"], key))
         names = [i["food_id"] for i in result["items"]]
         self.assertNotIn("juane", names)    # 23 g fat > 10 g limit
         self.assertNotIn("unknown", names)  # can't be verified
         self.assertEqual(names[0], "chicken")  # protein-rich use of the budget ranks first
 
     def test_exhausted_nutrient_explains_empty_result(self):
-        lean = self.c.recommend_within({"calories": 400, "fat": 0})["items"]
-        self.assertTrue(all(i["nutrients"]["fat"] <= 0.5 for i in lean))  # rounding tolerance only
+        self.assertEqual(self.c.recommend_within({"calories": 400, "fat": 0})["items"], [])  # strictly within
         result = self.c.recommend_within({"calories": 400, "protein": 0})
         self.assertEqual(result["items"], [])
         self.assertIn("protein", result["notice"])
@@ -58,7 +57,16 @@ class WithinLimitsTest(unittest.TestCase):
         free = [i["food_id"] for i in self.c.recommend({"calories": 500})["items"][:2]]
         self.assertIn("juane", free)
         capped = self.c.recommend({"calories": 500}, limits={"fat": 10})["items"]
-        self.assertTrue(all(i["nutrients"]["fat"] <= 10.5 for i in capped))
+        self.assertTrue(all(i["nutrients"]["fat"] <= 10.05 for i in capped))
+
+    def test_portions_follow_what_the_user_eats(self):
+        for grams in (150, 160, 140):  # usually ~150 g of chicken
+            self.c.log(day="2026-11-01", eaten_at=datetime(2026, 11, 1), meal="lunch", food_id="chicken",
+                       quantity=grams, unit="g")
+        portions = [p for _, p in self.c._portions(self.c.foods["chicken"])]
+        self.assertEqual(portions[0], "75 g")
+        self.assertEqual(portions[-1], "300 g")  # 2x the usual 150 g
+        self.assertIn("150 g", portions)
 
 
 class GoalsTest(unittest.TestCase):
