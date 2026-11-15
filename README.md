@@ -96,6 +96,11 @@ calories, and protein-rich ones, rank first. If nothing fits, it retries with th
 slack, which still leaves 60% of the daily goal for each remaining day. With explicit targets it
 finds the closest portions that still don't exceed the remaining goals.
 
+**Only foods you can still get.** `set_goals` with `recommend_since: 2025-03-01` limits
+recommendations to foods you've eaten on or after that date, for example since moving country.
+Custom foods saved after that date count too. Pass `recommend_since: ""` to remove the date.
+`recommend_foods` takes `since` to override it for one request (`""` searches all history).
+
 **Alerts.** Choose a notify service in the options (for example `notify.mobile_app_<phone>`).
 Each goal notifies once when it reaches the near threshold (default 90%) and once when it's
 exceeded. At most one notification is sent per 30 minutes; changes held back are included in
@@ -115,7 +120,7 @@ All of these return data (`return_response`). Correctable errors come back as
 | `get_diary` | A day's entries and totals, or a range with daily averages |
 | `save_food` | Add or update a custom food |
 | `delete_entries` | Remove diary entries |
-| `set_goals` / `get_goals` | Daily goals (0 removes one), weekly calorie budget and today's progress |
+| `set_goals` / `get_goals` | Daily goals (0 removes one), weekly calorie budget, `recommend_since` date, today's progress |
 | `sync_myfitnesspal` | Import from MyFitnessPal |
 
 MyFitnessPal has no public API. The integration uses the website's own endpoints, which can

@@ -103,6 +103,7 @@ class Tracker:
     def goal_status(self, day: str | None = None) -> dict[str, Any]:
         day = day or self.today()
         status = {"goals": self.goals, "calorie_period": self.calorie_period,
+                  "recommend_since": self.catalog.sync.get("recommend_since"),
                   "progress": progress(self.effective_goals(day), self.catalog.day(day)["totals"])}
         if week := self.week(day):
             status["week"] = week
@@ -271,15 +272,18 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         t = _tracker(hass)
         targets = {k: call.data[k] for k in GOAL_KEYS if k in call.data}
         kind, query, limit = call.data.get("kind"), call.data.get("query", ""), call.data["limit"]
+        # Only foods eaten since this date (e.g. available where the user lives now); "" disables.
+        since = call.data["since"] if "since" in call.data else t.catalog.sync.get("recommend_since")
+        since = since or None
         try:
             meal = meal_key(call.data["meal"]) if call.data.get("meal") else None
             if not targets:  # general suggestion: stay within this meal's share of today's goals
                 basis = t.meal_targets(meal)
                 flex = basis.pop("flex_limits", None)
-                result = t.catalog.recommend_within(basis.pop("limits"), kind, query, limit)
+                result = t.catalog.recommend_within(basis.pop("limits"), kind, query, limit, since=since)
                 if not result["items"] and flex:
                     # Nothing fits today's calorie share: use the weekly slack instead.
-                    result = t.catalog.recommend_within(flex, kind, query, limit)
+                    result = t.catalog.recommend_within(flex, kind, query, limit, since=since)
                     week = t.week()
                     result["weekly_flex_used"] = True
                     result["notice"] += (f" Nothing fit today's calorie share, so these use the weekly budget "
@@ -294,7 +298,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
                 remaining["calories"] = week["today_flex_max"]
             if not call.data.get("respect_goals", True):
                 remaining = {}
-            return t.catalog.recommend(targets, kind, query, limit, limits=remaining)
+            return t.catalog.recommend(targets, kind, query, limit, limits=remaining, since=since)
         except ValueError as error:
             return _fail(call, error)
 
@@ -307,6 +311,8 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
                     goals[key] = call.data[key]  # 0 removes the goal
             if "calorie_period" in call.data:
                 t.catalog.sync["calorie_period"] = call.data["calorie_period"]
+            if "recommend_since" in call.data:
+                t.catalog.sync["recommend_since"] = call.data["recommend_since"] or None
             t.catalog.sync["goals"] = clean_goals(goals)
             t.catalog.sync["alerts"] = {}  # re-evaluate against the new goals
             await t.save()
@@ -389,7 +395,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
              supports_response=SupportsResponse.ONLY)
     register(DOMAIN, "recommend_foods", recommend, vol.Schema({
         **targets, **kind, vol.Optional("query", default=""): cv.string, vol.Optional("meal"): MEAL,
-        vol.Optional("respect_goals", default=True): cv.boolean,
+        vol.Optional("respect_goals", default=True): cv.boolean, vol.Optional("since"): vol.Any("", DAY),
         vol.Optional("limit", default=5): vol.All(int, vol.Range(min=1, max=20)),
     }), supports_response=SupportsResponse.ONLY)
     register(DOMAIN, "log_food", log_food, vol.Schema({
@@ -415,6 +421,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     }), supports_response=SupportsResponse.OPTIONAL)
     register(DOMAIN, "set_goals", set_goals, vol.Schema({
         **targets, vol.Optional("calorie_period"): vol.In(["day", "week"]),
+        vol.Optional("recommend_since"): vol.Any("", DAY),
     }), supports_response=SupportsResponse.OPTIONAL)
     register(DOMAIN, "get_goals", get_goals, vol.Schema({}), supports_response=SupportsResponse.ONLY)
     register(DOMAIN, "sync_myfitnesspal", sync, vol.Schema({vol.Optional("since"): DAY}),

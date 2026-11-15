@@ -119,6 +119,10 @@
         "respect_goals": {
           "name": "Respect goals",
           "description": "Never exceed what's left of today's goals"
+        },
+        "since": {
+          "name": "Since",
+          "description": "Only foods eaten on or after this date; overrides the saved setting, empty disables it"
         }
       }
     },
@@ -291,6 +295,10 @@
         "calorie_period": {
           "name": "Calorie period",
           "description": "week (default): calories balance across Monday–Sunday; day: strict daily limit"
+        },
+        "recommend_since": {
+          "name": "Recommend only foods eaten since",
+          "description": "Recommendations only include foods eaten on or after this date (e.g. since moving); empty removes it"
         }
       }
     },

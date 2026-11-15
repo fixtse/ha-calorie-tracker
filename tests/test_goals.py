@@ -69,6 +69,34 @@ class WithinLimitsTest(unittest.TestCase):
         self.assertIn("150 g", portions)
 
 
+class SinceFilterTest(unittest.TestCase):
+    def test_only_foods_eaten_since(self):
+        c = core.Catalog()
+        c.upsert(food("lomo", "Lomo saltado", 1, "plato", calories=600, protein=35, carbohydrates=50, fat=25))
+        c.upsert(food("tortilla", "Tortilla española", 1, "ración", calories=550, protein=20, carbohydrates=40, fat=30))
+        c.log(day="2021-05-01", eaten_at=datetime(2021, 5, 1), meal="dinner", food_id="lomo")       # Peru
+        c.log(day="2026-10-01", eaten_at=datetime(2026, 10, 1), meal="dinner", food_id="tortilla")  # Spain
+        arepa = c.save_manual("Arepa", "", 1, "unidad", {"calories": 180, "protein": 4, "carbohydrates": 30, "fat": 5})
+        targets = {"calories": 580}
+        everything = {i["food_id"] for i in c.recommend(targets)["items"]}
+        self.assertEqual(everything, {"lomo", "tortilla", arepa["id"]})
+        recent = c.recommend(targets, since="2026-01-01")
+        self.assertEqual({i["food_id"] for i in recent["items"]}, {"tortilla", arepa["id"]})  # saved today counts
+        self.assertEqual(recent["only_eaten_since"], "2026-01-01")
+        within = c.recommend_within({"calories": 700, "fat": 40}, since="2026-01-01")["items"]
+        self.assertNotIn("lomo", {i["food_id"] for i in within})
+
+
+class DuplicateNamesTest(unittest.TestCase):
+    def test_same_name_suggested_once(self):
+        c = core.Catalog()
+        for i, brand in ((1, "Brillante"), (2, "Sabroz")):
+            item = food(f"q{i}", "Quinoa real", 100, "g", calories=120 + i, protein=4, carbohydrates=21, fat=2)
+            c.upsert({**item, "brand": brand})
+        names = [i["name"] for i in c.recommend({"calories": 300})["items"]]
+        self.assertEqual(names.count("Quinoa real"), 1)
+
+
 class GoalsTest(unittest.TestCase):
     G = {"calories": 2000, "protein": 150, "carbohydrates": 200, "fat": 60}
 

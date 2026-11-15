@@ -121,6 +121,7 @@ class Catalog:
             "id": food_id, "source": "manual", "kind": "food", "name": name.strip(),
             "brand": brand.strip(), "serving_amount": amount, "serving_unit": unit.strip(),
             "servings": [], "ingredients": [], "nutrients": nutrients(values),
+            "saved": datetime.now().date().isoformat(),
         })
 
     def search(self, query: str, kind: str | None, offset: int, limit: int) -> dict[str, Any]:
@@ -149,9 +150,29 @@ class Catalog:
             "carbohydrates": values["carbohydrates"], "fat": values["fat"],
         }
 
-    def _candidates(self, kind: str | None, query: str, needed: set[str]):
+    def last_eaten(self) -> dict[str, str]:
+        """Most recent diary day per food id (cached until the diary changes)."""
+        key = (len(self.entries), self.entries[-1]["id"] if self.entries else None)
+        if getattr(self, "_last_key", None) != key:
+            last: dict[str, str] = {}
+            for entry in self.entries:
+                food_id = entry.get("food_id")
+                if food_id and entry["day"] > last.get(food_id, ""):
+                    last[food_id] = entry["day"]
+            self._last_cache, self._last_key = last, key
+        return self._last_cache
+
+    def available_since(self, food: dict[str, Any], since: str | None) -> bool:
+        """Eaten on/after `since` (or a custom food saved since then): likely still obtainable."""
+        if not since:
+            return True
+        return self.last_eaten().get(food["id"], "") >= since or food.get("saved", "") >= since
+
+    def _candidates(self, kind: str | None, query: str, needed: set[str], since: str | None = None):
         words = fold(query).split()
         for food in self.foods.values():
+            if not self.available_since(food, since):
+                continue
             if kind and food["kind"] != kind:
                 continue
             if words and not all(w in fold(food["name"] + " " + food.get("brand", "")) for w in words):
@@ -169,10 +190,12 @@ class Catalog:
         ranked.sort(key=lambda r: r[:2])
         seen, picks = set(), []
         for score, usage, food_id, factor, portion in ranked:
-            if food_id in seen:
-                continue
-            seen.add(food_id)
             food = self.foods[food_id]
+            # MyFitnessPal often has several entries (or brand labels) for one dish; suggest each name once.
+            key = " ".join(fold(food["name"]).split())
+            if food_id in seen or key in seen:
+                continue
+            seen.update((food_id, key))
             picks.append({
                 "food_id": food_id, "name": food["name"], "brand": food.get("brand", ""), "kind": food["kind"],
                 "portion": portion, "servings": round(factor, 3),
@@ -184,7 +207,8 @@ class Catalog:
         return picks
 
     def recommend(self, targets: dict[str, float], kind: str | None = None, query: str = "",
-                  limit: int = 5, tolerance: float = 0.15, limits: dict[str, float] | None = None) -> dict[str, Any]:
+                  limit: int = 5, tolerance: float = 0.15, limits: dict[str, float] | None = None,
+                  since: str | None = None) -> dict[str, Any]:
         """Foods whose portion is closest to explicit targets (any of calories/protein/carbs/fat).
 
         Error is the mean relative difference, with a small absolute floor so 0 g targets work.
@@ -197,7 +221,7 @@ class Catalog:
         limits = {k: max(v, 0) for k, v in (limits or {}).items() if k in TARGETS}
         floor = {"calories": 25.0, "protein": 3.0, "carbohydrates": 3.0, "fat": 2.0}
         ranked = []
-        for food in self._candidates(kind, query, set(targets) | set(limits)):
+        for food in self._candidates(kind, query, set(targets) | set(limits), since):
             values = food["nutrients"]
             for factor, portion in self._portions(food):
                 if not self._within(values, factor, limits):
@@ -212,10 +236,12 @@ class Catalog:
                   "notice": "Portions are scaled from the saved serving. Log with food_id and servings."}
         if limits:
             result["limits"] = limits
+        if since:
+            result["only_eaten_since"] = since
         return result
 
     def recommend_within(self, limits: dict[str, float], kind: str | None = None, query: str = "",
-                         limit: int = 5, fill: float = 0.85) -> dict[str, Any]:
+                         limit: int = 5, fill: float = 0.85, since: str | None = None) -> dict[str, Any]:
         """General suggestions that stay within every limit (e.g. this meal's share of remaining goals).
 
         A portion never exceeds any limit. Among those, portions using about `fill` of the budget
@@ -226,7 +252,7 @@ class Catalog:
         if not limits:
             raise ValueError("No limits to recommend within; set goals or give explicit targets")
         ranked = []
-        for food in self._candidates(kind, query, set(limits)):
+        for food in self._candidates(kind, query, set(limits), since):
             values = food["nutrients"]
             for factor, portion in self._portions(food):
                 if not self._within(values, factor, limits):
@@ -249,6 +275,8 @@ class Catalog:
             exhausted = [k for k, v in limits.items() if v <= 0]
             result["notice"] = ("Nothing fits: " + ", ".join(exhausted) + " already used up today."
                                 if exhausted else "No registered food fits within these limits.")
+        if since:
+            result["only_eaten_since"] = since
         return result
 
     @staticmethod

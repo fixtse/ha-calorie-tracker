@@ -17,6 +17,7 @@ recommend_foods:
     query: { selector: { text: } }
     meal: { example: cena, selector: { text: } }
     respect_goals: { default: true, selector: { boolean: } }
+    since: { selector: { date: } }
     limit: { default: 5, selector: { number: { min: 1, max: 20 } } }
 log_food:
   fields:
@@ -64,4 +65,5 @@ set_goals:
     carbohydrates: { selector: { number: { min: 0, max: 2000, unit_of_measurement: g, mode: box } } }
     fat: { selector: { number: { min: 0, max: 1000, unit_of_measurement: g, mode: box } } }
     calorie_period: { selector: { select: { options: [week, day] } } }
+    recommend_since: { selector: { date: } }
 get_goals:
