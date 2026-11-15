@@ -80,6 +80,27 @@ install it with `install_dashboard.py` inside the HA container (pass a token on 
   `sensor.calorie_tracker_recipes_and_meals` (with ingredients),
   `sensor.calorie_tracker_myfitnesspal_sync` and `button.calorie_tracker_sync_myfitnesspal`.
 
+## Goals and alerts
+
+Set daily goals for calories, protein, carbohydrates and fat with `calorie_tracker.set_goals`
+(or ask Zero). Calories are balanced **weekly** (Monday–Sunday) by default: today's allowance is
+what's left of the week (daily goal × 7) divided by the days left, so a light day leaves more for
+later and a heavy one less. Use `calorie_period: day` for a strict daily limit.
+`sensor.calorie_tracker_<nutrient>_remaining` shows what's left, with goal, eaten and percent
+(plus the weekly budget on calories).
+
+**Recommendations.** Without targets, `recommend_foods` suggests foods that stay **within** this
+meal's share of what's left: protein/carbs/fat today, and calories from the weekly allowance.
+None of the options needs to use the budget fully. Portions using about 85% of the meal's
+calories, and protein-rich ones, rank first. If nothing fits, it retries with the weekly calorie
+slack, which still leaves 60% of the daily goal for each remaining day. With explicit targets it
+finds the closest portions that still don't exceed the remaining goals.
+
+**Alerts.** Choose a notify service in the options (for example `notify.mobile_app_<phone>`).
+Each goal notifies once when it reaches the near threshold (default 90%) and once when it's
+exceeded. At most one notification is sent per 30 minutes; changes held back are included in
+the next one.
+
 ## Services
 
 All of these return data (`return_response`). Correctable errors come back as
@@ -89,11 +110,12 @@ All of these return data (`return_response`). Correctable errors come back as
 |---|---|
 | `search_foods` | Search by name/brand, most used first |
 | `get_food` | All nutrients, serving sizes and ingredients |
-| `recommend_foods` | Foods and portions close to any of `calories`, `protein`, `carbohydrates`, `fat` |
+| `recommend_foods` | No targets: options within this `meal`'s share of remaining goals. Targets (any of `calories`, `protein`, `carbohydrates`, `fat`): closest portions within remaining goals |
 | `log_food` | Log `food_id` with `servings` or `quantity` + `unit`, or `name` + nutrients. `meal` accepts breakfast/desayuno, lunch/almuerzo, dinner/cena, snack |
 | `get_diary` | A day's entries and totals, or a range with daily averages |
 | `save_food` | Add or update a custom food |
 | `delete_entries` | Remove diary entries |
+| `set_goals` / `get_goals` | Daily goals (0 removes one), weekly calorie budget and today's progress |
 | `sync_myfitnesspal` | Import from MyFitnessPal |
 
 MyFitnessPal has no public API. The integration uses the website's own endpoints, which can

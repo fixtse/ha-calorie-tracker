@@ -39,7 +39,8 @@
       "init": {
         "title": "Calorie Tracker options",
         "data": {
-          "daily_goal": "Daily calorie goal (0 = none)",
+          "notify_service": "Notify service for goal alerts (empty = off)",
+          "near_percent": "Alert when a goal reaches this percent",
           "sync_time": "Daily MyFitnessPal sync time",
           "history_start": "Import MyFitnessPal diary history from"
         }
@@ -81,7 +82,7 @@
     },
     "recommend_foods": {
       "name": "Recommend foods",
-      "description": "Suggest registered foods and portions close to any combination of calorie, protein, carbohydrate and fat targets.",
+      "description": "Suggest registered foods and portions. With calorie/protein/carbohydrate/fat targets: closest match that stays within today's remaining goals. Without targets: options within this meal's share of the remaining goals.",
       "fields": {
         "calories": {
           "name": "Calories",
@@ -110,6 +111,14 @@
         "limit": {
           "name": "Limit",
           "description": "Number of suggestions"
+        },
+        "meal": {
+          "name": "Meal",
+          "description": "breakfast/desayuno, lunch/almuerzo, dinner/cena or snack; sets the share of remaining goals"
+        },
+        "respect_goals": {
+          "name": "Respect goals",
+          "description": "Never exceed what's left of today's goals"
         }
       }
     },
@@ -258,6 +267,36 @@
           "description": "Rescan the diary from this date"
         }
       }
+    },
+    "set_goals": {
+      "name": "Set goals",
+      "description": "Set daily calorie and macro goals. Omitted values keep their goal. Calories are balanced weekly unless calorie_period is day.",
+      "fields": {
+        "calories": {
+          "name": "Calories",
+          "description": "Daily goal; 0 removes it"
+        },
+        "protein": {
+          "name": "Protein",
+          "description": "Daily goal; 0 removes it"
+        },
+        "carbohydrates": {
+          "name": "Carbohydrates",
+          "description": "Daily goal; 0 removes it"
+        },
+        "fat": {
+          "name": "Fat",
+          "description": "Daily goal; 0 removes it"
+        },
+        "calorie_period": {
+          "name": "Calorie period",
+          "description": "week (default): calories balance across Monday–Sunday; day: strict daily limit"
+        }
+      }
+    },
+    "get_goals": {
+      "name": "Get goals",
+      "description": "Daily goals and today's progress."
     }
   },
   "entity": {}

@@ -15,15 +15,17 @@ from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, Supp
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.dispatcher import async_dispatcher_send
-from homeassistant.helpers.event import async_track_time_change, async_track_time_interval
+from homeassistant.helpers.event import async_call_later, async_track_time_change, async_track_time_interval
 from homeassistant.components import persistent_notification
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from .const import (
-    CONF_DAILY_GOAL, CONF_HISTORY_START, CONF_SESSION_TOKEN, CONF_SYNC_TIME, DEFAULT_HISTORY_START,
-    DEFAULT_SYNC_TIME, DOMAIN, OVERLAP_DAYS, SIGNAL_UPDATED, STORAGE_VERSION,
+    CONF_DAILY_GOAL, CONF_HISTORY_START, CONF_NEAR_PERCENT, CONF_NOTIFY_SERVICE, CONF_SESSION_TOKEN,
+    CONF_SYNC_TIME, DEFAULT_HISTORY_START, DEFAULT_NEAR_PERCENT, DEFAULT_SYNC_TIME, DOMAIN, OVERLAP_DAYS,
+    SIGNAL_UPDATED, STORAGE_VERSION,
 )
+from .goals import ALERT_INTERVAL, GOAL_KEYS, check_alerts, clean_goals, meal_targets, progress, week_budget
 from .core import KINDS, Catalog, meal_key
 from .mfp import AuthError, MyFitnessPal, sync_catalog
 
@@ -60,7 +62,9 @@ class Tracker:
         self.status = self.catalog.sync.get("status", {"state": "idle"})
         if self.status.get("state") == "running":  # interrupted by a restart
             self.status = {**self.status, "state": "interrupted"}
-        elif self.status.get("state") == "auth_failed":
+        if "goals" not in self.catalog.sync and self.entry.options.get(CONF_DAILY_GOAL):
+            self.catalog.sync["goals"] = {"calories": float(self.entry.options[CONF_DAILY_GOAL])}
+        if self.status.get("state") == "auth_failed":
             # Loading follows a restart or a re-authentication; let the next check decide again.
             self.status = {**self.status, "state": "idle"}
 
@@ -68,6 +72,75 @@ class Tracker:
         self.catalog.sync["status"] = self.status
         await self.store.async_save(self.catalog.dump())
         async_dispatcher_send(self.hass, SIGNAL_UPDATED)
+
+    # ---- goals and alerts ----------------------------------------------------------------
+    @property
+    def goals(self) -> dict[str, float]:
+        return clean_goals(self.catalog.sync.get("goals"))
+
+    @property
+    def calorie_period(self) -> str:
+        return self.catalog.sync.get("calorie_period", "week")
+
+    def week(self, day: str | None = None) -> dict[str, Any] | None:
+        """Weekly calorie budget (Monday-Sunday) for the given day, when calories are weekly."""
+        goal = self.goals.get("calories")
+        if not goal or self.calorie_period != "week":
+            return None
+        current = dt.date.fromisoformat(day or self.today())
+        monday = current - timedelta(days=current.weekday())
+        before = [(monday + timedelta(days=i)).isoformat() for i in range(current.weekday())]
+        eaten_before = sum(d["calories"] for d in self.catalog.history(before)) if before else 0
+        eaten_today = self.catalog.day(current.isoformat())["totals"]["calories"] or 0
+        return week_budget(goal, eaten_before, eaten_today, 7 - current.weekday())
+
+    def effective_goals(self, day: str | None = None) -> dict[str, float]:
+        goals = dict(self.goals)
+        if week := self.week(day):
+            goals["calories"] = max(week["today_allowance"], 1)
+        return goals
+
+    def goal_status(self, day: str | None = None) -> dict[str, Any]:
+        day = day or self.today()
+        status = {"goals": self.goals, "calorie_period": self.calorie_period,
+                  "progress": progress(self.effective_goals(day), self.catalog.day(day)["totals"])}
+        if week := self.week(day):
+            status["week"] = week
+        return status
+
+    def meal_targets(self, meal: str | None) -> dict[str, Any]:
+        today = self.catalog.day(self.today())
+        week = self.week()
+        flex = {"calories": week["today_flex_max"]} if week else None
+        return meal_targets(self.effective_goals(), today["totals"], set(today["meals"]), meal, flex)
+
+    async def check_alerts(self, _now: Any = None) -> None:
+        """Notify when a goal gets near or over; at most one notification per 30 minutes."""
+        self._alert_timer = None
+        service = self.entry.options.get(CONF_NOTIFY_SERVICE)
+        if not service or not self.goals:
+            return
+        state, message = check_alerts(
+            self.effective_goals(), self.catalog.day(self.today())["totals"], self.catalog.sync.get("alerts", {}),
+            self.today(), dt_util.utcnow(), self.entry.options.get(CONF_NEAR_PERCENT, DEFAULT_NEAR_PERCENT),
+            self.week())
+        self.catalog.sync["alerts"] = state
+        if message:
+            domain, name = service.split(".", 1)
+            try:
+                await self.hass.services.async_call(domain, name, {
+                    "title": "Calorie Tracker", "message": message,
+                    "data": {"tag": DOMAIN, "group": DOMAIN}}, blocking=True)
+            except Exception as error:
+                _LOGGER.warning("Calorie Tracker notification failed: %s", error)
+        elif state.get("pending") and not getattr(self, "_alert_timer", None):
+            wait = ALERT_INTERVAL - (dt_util.utcnow() - datetime.fromisoformat(state["last_sent"]))
+            self._alert_timer = async_call_later(self.hass, max(wait.total_seconds(), 1) + 1, self._deferred_alert)
+        await self.store.async_save(self.catalog.dump())
+
+    @callback
+    def _deferred_alert(self, _now: Any) -> None:
+        self.hass.async_create_task(self.check_alerts())
 
     def today(self) -> str:
         return dt_util.now().date().isoformat()
@@ -120,6 +193,7 @@ class Tracker:
             self.status = {"state": "error", "error": str(error)[:300], "at": dt_util.utcnow().isoformat()}
             await self.save()
             raise HomeAssistantError(f"MyFitnessPal sync failed: {error}") from error
+        await self.check_alerts()
         self.status = {"state": "ok", "at": dt_util.utcnow().isoformat(), "range": f"{start}..{today}",
                        "result": {k: v for k, v in result.items() if k != "new_food_names"}}
         await self.save()
@@ -194,12 +268,53 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             return _fail(call, error)
 
     async def recommend(call: ServiceCall) -> ServiceResponse:
-        targets = {k: call.data[k] for k in ("calories", "protein", "carbohydrates", "fat") if k in call.data}
+        t = _tracker(hass)
+        targets = {k: call.data[k] for k in GOAL_KEYS if k in call.data}
+        kind, query, limit = call.data.get("kind"), call.data.get("query", ""), call.data["limit"]
         try:
-            return _tracker(hass).catalog.recommend(
-                targets, call.data.get("kind"), call.data.get("query", ""), call.data["limit"])
+            meal = meal_key(call.data["meal"]) if call.data.get("meal") else None
+            if not targets:  # general suggestion: stay within this meal's share of today's goals
+                basis = t.meal_targets(meal)
+                flex = basis.pop("flex_limits", None)
+                result = t.catalog.recommend_within(basis.pop("limits"), kind, query, limit)
+                if not result["items"] and flex:
+                    # Nothing fits today's calorie share: use the weekly slack instead.
+                    result = t.catalog.recommend_within(flex, kind, query, limit)
+                    week = t.week()
+                    result["weekly_flex_used"] = True
+                    result["notice"] += (f" Nothing fit today's calorie share, so these use the weekly budget "
+                                         f"(week remaining {week['week_remaining']} kcal over {week['days_left']} days).")
+                result["based_on_goals"] = basis
+                if week := t.week():
+                    result["week"] = week
+                return result
+            # Explicit targets: closest match, never beyond what's left of today's goals.
+            remaining = {k: max(v["remaining"], 0) for k, v in t.goal_status()["progress"].items()}
+            if week := t.week():  # explicit requests may use the weekly calorie slack
+                remaining["calories"] = week["today_flex_max"]
+            if not call.data.get("respect_goals", True):
+                remaining = {}
+            return t.catalog.recommend(targets, kind, query, limit, limits=remaining)
         except ValueError as error:
             return _fail(call, error)
+
+    async def set_goals(call: ServiceCall) -> ServiceResponse:
+        t = _tracker(hass)
+        async with t.lock:
+            goals = dict(t.catalog.sync.get("goals", {}))
+            for key in GOAL_KEYS:
+                if key in call.data:
+                    goals[key] = call.data[key]  # 0 removes the goal
+            if "calorie_period" in call.data:
+                t.catalog.sync["calorie_period"] = call.data["calorie_period"]
+            t.catalog.sync["goals"] = clean_goals(goals)
+            t.catalog.sync["alerts"] = {}  # re-evaluate against the new goals
+            await t.save()
+            await t.check_alerts()
+        return t.goal_status()
+
+    async def get_goals(call: ServiceCall) -> ServiceResponse:
+        return _tracker(hass).goal_status()
 
     async def log_food(call: ServiceCall) -> ServiceResponse:
         t = _tracker(hass)
@@ -216,7 +331,9 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             except (KeyError, ValueError) as error:
                 return _fail(call, error)
             await t.save()
-        return {"entry": entry, "day_totals": t.catalog.day(entry["day"])["totals"]}
+            await t.check_alerts()
+        return {"entry": entry, "day_totals": t.catalog.day(entry["day"])["totals"],
+                **({"goals": t.goal_status(entry["day"])["progress"]} if t.goals else {})}
 
     async def delete_entries(call: ServiceCall) -> ServiceResponse:
         t = _tracker(hass)
@@ -233,7 +350,10 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         start = call.data.get("start") or t.today()
         end = call.data.get("end")
         if not end or end == start:
-            return t.catalog.day(start)
+            day = t.catalog.day(start)
+            if t.goals:
+                day["goals"] = t.goal_status(start)["progress"]
+            return day
         if end < start or (dt.date.fromisoformat(end) - dt.date.fromisoformat(start)).days > 366:
             raise ServiceValidationError("end must be after start and within 366 days")
         return t.catalog.range(start, end)
@@ -268,7 +388,8 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     register(DOMAIN, "get_food", get_food, vol.Schema({vol.Required("food_id"): cv.string}),
              supports_response=SupportsResponse.ONLY)
     register(DOMAIN, "recommend_foods", recommend, vol.Schema({
-        **targets, **kind, vol.Optional("query", default=""): cv.string,
+        **targets, **kind, vol.Optional("query", default=""): cv.string, vol.Optional("meal"): MEAL,
+        vol.Optional("respect_goals", default=True): cv.boolean,
         vol.Optional("limit", default=5): vol.All(int, vol.Range(min=1, max=20)),
     }), supports_response=SupportsResponse.ONLY)
     register(DOMAIN, "log_food", log_food, vol.Schema({
@@ -292,6 +413,10 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         vol.Optional("serving_unit", default="serving"): vol.All(cv.string, vol.Length(min=1, max=50)),
         vol.Required("calories"): NUMBER, **{k: v for k, v in nutrients.items() if str(k) != "calories"},
     }), supports_response=SupportsResponse.OPTIONAL)
+    register(DOMAIN, "set_goals", set_goals, vol.Schema({
+        **targets, vol.Optional("calorie_period"): vol.In(["day", "week"]),
+    }), supports_response=SupportsResponse.OPTIONAL)
+    register(DOMAIN, "get_goals", get_goals, vol.Schema({}), supports_response=SupportsResponse.ONLY)
     register(DOMAIN, "sync_myfitnesspal", sync, vol.Schema({vol.Optional("since"): DAY}),
              supports_response=SupportsResponse.OPTIONAL)
     return True

@@ -11,8 +11,8 @@ from homeassistant.core import callback
 from homeassistant.helpers import selector
 
 from .const import (
-    CONF_DAILY_GOAL, CONF_HISTORY_START, CONF_SESSION_TOKEN, CONF_SYNC_TIME, DEFAULT_HISTORY_START,
-    DEFAULT_SYNC_TIME, DOMAIN,
+    CONF_HISTORY_START, CONF_NEAR_PERCENT, CONF_NOTIFY_SERVICE, CONF_SESSION_TOKEN, CONF_SYNC_TIME,
+    DEFAULT_HISTORY_START, DEFAULT_NEAR_PERCENT, DEFAULT_SYNC_TIME, DOMAIN,
 )
 from .mfp import AuthError, MyFitnessPal
 
@@ -91,9 +91,13 @@ class CalorieTrackerOptionsFlow(OptionsFlowWithReload):
                 user_input[CONF_SYNC_TIME] = user_input[CONF_SYNC_TIME][:5]
             return self.async_create_entry(data=user_input)
         options = self.config_entry.options
+        notifiers = sorted(f"notify.{name}" for name in self.hass.services.async_services_for_domain("notify")
+                           if name not in ("notify", "send_message", "persistent_notification"))
         return self.async_show_form(step_id="init", data_schema=vol.Schema({
-            vol.Optional(CONF_DAILY_GOAL, default=options.get(CONF_DAILY_GOAL, 0)): vol.All(
-                vol.Coerce(int), vol.Range(min=0, max=10000)),
+            vol.Optional(CONF_NOTIFY_SERVICE, description={"suggested_value": options.get(CONF_NOTIFY_SERVICE)}):
+                selector.SelectSelector(selector.SelectSelectorConfig(options=notifiers, custom_value=True)),
+            vol.Optional(CONF_NEAR_PERCENT, default=options.get(CONF_NEAR_PERCENT, DEFAULT_NEAR_PERCENT)):
+                vol.All(vol.Coerce(int), vol.Range(min=50, max=100)),
             vol.Optional(CONF_SYNC_TIME, default=options.get(CONF_SYNC_TIME, DEFAULT_SYNC_TIME)):
                 selector.TimeSelector(),
             vol.Optional(CONF_HISTORY_START, default=options.get(CONF_HISTORY_START, DEFAULT_HISTORY_START)):

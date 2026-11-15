@@ -149,35 +149,26 @@ class Catalog:
             "carbohydrates": values["carbohydrates"], "fat": values["fat"],
         }
 
-    def recommend(self, targets: dict[str, float], kind: str | None = None, query: str = "",
-                  limit: int = 5, tolerance: float = 0.15) -> dict[str, Any]:
-        """Rank foods by how closely a sensible portion matches the requested nutrient targets.
-
-        Any subset of calories/protein/carbohydrates/fat may be given. Each food is tried at
-        several portion sizes; error is the mean relative difference (with a small absolute floor
-        so 0 g targets work). Foods whose best portion is within tolerance are marked as a match.
-        """
-        targets = {TARGET_ALIASES.get(k, k): float(v) for k, v in targets.items() if v is not None}
-        targets = {k: v for k, v in targets.items() if k in TARGETS and v >= 0}
-        if not targets:
-            raise ValueError("Give at least one target: calories, protein, carbohydrates or fat")
-        floor = {"calories": 25.0, "protein": 3.0, "carbohydrates": 3.0, "fat": 2.0}
+    def _candidates(self, kind: str | None, query: str, needed: set[str]):
         words = fold(query).split()
-        ranked = []
         for food in self.foods.values():
             if kind and food["kind"] != kind:
                 continue
             if words and not all(w in fold(food["name"] + " " + food.get("brand", "")) for w in words):
                 continue
             values = food["nutrients"]
-            if any(values.get(k) is None for k in targets) or not values.get("calories"):
-                continue
-            for factor, portion in self._portions(food):
-                error = sum(abs(values[k] * factor - v) / max(v, floor[k]) for k, v in targets.items()) / len(targets)
-                ranked.append((error, -(food.get("uses", 0) * 5 + food.get("mfp_uses", 0)), food["id"], factor, portion))
-        ranked.sort()
+            if not values.get("calories") or any(values.get(k) is None for k in needed):
+                continue  # limits can't be verified without these values
+            yield food
+
+    @staticmethod
+    def _within(values: dict, factor: float, limits: dict[str, float]) -> bool:
+        return all(values[k] * factor <= cap + 0.5 for k, cap in limits.items())
+
+    def _pick(self, ranked: list, limit: int, matcher) -> list[dict[str, Any]]:
+        ranked.sort(key=lambda r: r[:2])
         seen, picks = set(), []
-        for error, _, food_id, factor, portion in ranked:
+        for score, usage, food_id, factor, portion in ranked:
             if food_id in seen:
                 continue
             seen.add(food_id)
@@ -186,12 +177,80 @@ class Catalog:
                 "food_id": food_id, "name": food["name"], "brand": food.get("brand", ""), "kind": food["kind"],
                 "portion": portion, "servings": round(factor, 3),
                 "nutrients": {k: v for k, v in scale(food["nutrients"], factor).items() if k in TARGETS},
-                "match": error <= tolerance, "difference_pct": round(error * 100),
+                **matcher(score),
             })
             if len(picks) == limit:
                 break
-        return {"targets": targets, "items": picks,
-                "notice": "Portions are scaled from the saved serving. Log with food_id and servings."}
+        return picks
+
+    def recommend(self, targets: dict[str, float], kind: str | None = None, query: str = "",
+                  limit: int = 5, tolerance: float = 0.15, limits: dict[str, float] | None = None) -> dict[str, Any]:
+        """Foods whose portion is closest to explicit targets (any of calories/protein/carbs/fat).
+
+        Error is the mean relative difference, with a small absolute floor so 0 g targets work.
+        Optional limits (e.g. what's left of today's goals) are hard caps a portion may not exceed.
+        """
+        targets = {TARGET_ALIASES.get(k, k): float(v) for k, v in targets.items() if v is not None}
+        targets = {k: v for k, v in targets.items() if k in TARGETS and v >= 0}
+        if not targets:
+            raise ValueError("Give at least one target: calories, protein, carbohydrates or fat")
+        limits = {k: max(v, 0) for k, v in (limits or {}).items() if k in TARGETS}
+        floor = {"calories": 25.0, "protein": 3.0, "carbohydrates": 3.0, "fat": 2.0}
+        ranked = []
+        for food in self._candidates(kind, query, set(targets) | set(limits)):
+            values = food["nutrients"]
+            for factor, portion in self._portions(food):
+                if not self._within(values, factor, limits):
+                    continue
+                error = sum(abs(values[k] * factor - v) / max(v, floor[k]) for k, v in targets.items()) / len(targets)
+                ranked.append((error, -self._usage(food), food["id"], factor, portion))
+        picks = self._pick(ranked, limit, lambda e: {"match": e <= tolerance, "difference_pct": round(e * 100)})
+        result = {"mode": "targets", "targets": targets, "items": picks,
+                  "notice": "Portions are scaled from the saved serving. Log with food_id and servings."}
+        if limits:
+            result["limits"] = limits
+        return result
+
+    def recommend_within(self, limits: dict[str, float], kind: str | None = None, query: str = "",
+                         limit: int = 5, fill: float = 0.85) -> dict[str, Any]:
+        """General suggestions that stay within every limit (e.g. this meal's share of remaining goals).
+
+        A portion never exceeds any limit. Among those, portions using about `fill` of the budget
+        rank first (calories when limited, else the average share), with a bonus for protein when
+        protein is limited, since it is usually the goal to reach rather than avoid.
+        """
+        limits = {k: max(float(v), 0) for k, v in limits.items() if k in TARGETS}
+        if not limits:
+            raise ValueError("No limits to recommend within; set goals or give explicit targets")
+        ranked = []
+        for food in self._candidates(kind, query, set(limits)):
+            values = food["nutrients"]
+            for factor, portion in self._portions(food):
+                if not self._within(values, factor, limits):
+                    continue
+                shares = {k: values[k] * factor / cap for k, cap in limits.items() if cap > 0}
+                if not shares:
+                    continue
+                used = shares.get("calories", sum(shares.values()) / len(shares))
+                if used < 0.25:
+                    continue  # too small to be a meal suggestion
+                score = abs(used - fill) - 0.3 * shares.get("protein", 0)
+                ranked.append((score, -self._usage(food), food["id"], factor, portion))
+        picks = self._pick(ranked, limit, lambda s: {})
+        for pick in picks:
+            pick["share_of_budget_pct"] = {k: round(pick["nutrients"][k] / cap * 100)
+                                           for k, cap in limits.items() if cap > 0 and pick["nutrients"].get(k) is not None}
+        result = {"mode": "within_limits", "limits": limits, "items": picks,
+                  "notice": "Every option stays within the limits; none needs to use them fully."}
+        if not picks:
+            exhausted = [k for k, v in limits.items() if v <= 0]
+            result["notice"] = ("Nothing fits: " + ", ".join(exhausted) + " already used up today."
+                                if exhausted else "No registered food fits within these limits.")
+        return result
+
+    @staticmethod
+    def _usage(food: dict[str, Any]) -> int:
+        return food.get("uses", 0) * 5 + food.get("mfp_uses", 0)
 
     @staticmethod
     def _portions(food: dict[str, Any]) -> list[tuple[float, str]]:

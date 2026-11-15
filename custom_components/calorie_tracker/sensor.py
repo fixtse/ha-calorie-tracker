@@ -12,7 +12,7 @@ from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import CONF_DAILY_GOAL, DOMAIN, SIGNAL_UPDATED
+from .const import DOMAIN, SIGNAL_UPDATED
 
 TOTALS = (
     ("calories_today", "Calories today", "calories", "kcal", "mdi:fire"),
@@ -29,8 +29,8 @@ def device_info() -> DeviceInfo:
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, add: AddEntitiesCallback) -> None:
     tracker = entry.runtime_data
     entities: list[SensorEntity] = [TotalSensor(tracker, *spec) for spec in TOTALS]
-    if entry.options.get(CONF_DAILY_GOAL):
-        entities.append(RemainingSensor(tracker, entry.options[CONF_DAILY_GOAL]))
+    entities += [RemainingSensor(tracker, nutrient, name.replace(" today", ""), unit, "mdi:target")
+                 for _, name, nutrient, unit, _ in TOTALS]
     entities += [SyncSensor(tracker), SelectedDaySensor(tracker), HistorySensor(tracker), RecipesSensor(tracker)]
     add(entities)
 
@@ -77,21 +77,39 @@ class TotalSensor(Base):
 
 
 class RemainingSensor(Base):
-    _attr_native_unit_of_measurement = "kcal"
-    _attr_icon = "mdi:target"
+    """What's left of one daily goal; unknown when that goal is not set."""
 
-    def __init__(self, tracker, goal: int) -> None:
-        super().__init__(tracker, "calories_remaining", "Calories remaining")
-        self.goal = goal
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(self, tracker, nutrient: str, name: str, unit: str, icon: str) -> None:
+        super().__init__(tracker, f"{nutrient}_remaining", f"{name} remaining")
+        self.nutrient = nutrient
+        self._attr_native_unit_of_measurement = unit
+        self._attr_icon = icon
+        self._attr_suggested_display_precision = 0
+
+    def _status(self):
+        return self.tracker.goal_status()
+
+    def _item(self):
+        return self._status()["progress"].get(self.nutrient)
 
     @property
     def native_value(self):
-        eaten = self.tracker.catalog.day(self.tracker.today())["totals"]["calories"] or 0
-        return round(self.goal - eaten)
+        item = self._item()
+        return None if item is None else item["remaining"]
 
     @property
     def extra_state_attributes(self):
-        return {"goal": self.goal}
+        status = self._status()
+        item = status["progress"].get(self.nutrient)
+        if not item:
+            return {"goal": None}
+        attrs = {"goal": item["goal"], "eaten": item["eaten"], "percent": item["percent"]}
+        if self.nutrient == "calories" and status.get("week"):
+            attrs.update(status["week"])
+            attrs["daily_goal"] = status["goals"]["calories"]
+        return attrs
 
 
 class SyncSensor(Base):
