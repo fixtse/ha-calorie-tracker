@@ -17,4 +17,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: hacs/action@main
-        with: { category: integration, ignore: brands }
+        with: { category: integration, ignore: brands license }

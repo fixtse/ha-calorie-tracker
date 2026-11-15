@@ -3,14 +3,14 @@
     "step": {
       "user": {
         "title": "Calorie Tracker",
-        "description": "Optional: paste your MyFitnessPal session cookie to import your foods, meals, recipes and diary history. In a browser logged in to myfitnesspal.com open developer tools → Storage/Application → Cookies → https://www.myfitnesspal.com and copy the value of `__Secure-next-auth.session-token`.",
+        "description": "Optional: paste a MyFitnessPal session cookie to import your foods, meals, recipes and diary history. Open a private browser window and log in to MyFitnessPal, open developer tools → Storage/Application → Cookies, copy the value of `__Secure-next-auth.session-token`, then close the private window without logging out. Do not reuse this cookie anywhere else: MyFitnessPal revokes sessions whose cookie is reused.",
         "data": {
           "session_token": "MyFitnessPal session cookie"
         }
       },
       "reauth_confirm": {
         "title": "MyFitnessPal session expired",
-        "description": "Log in at myfitnesspal.com and paste a new `__Secure-next-auth.session-token` cookie value.",
+        "description": "The MyFitnessPal session ended. Open a private browser window and log in to MyFitnessPal, open developer tools → Storage/Application → Cookies, copy the value of `__Secure-next-auth.session-token`, then close the private window without logging out. Do not reuse this cookie anywhere else: MyFitnessPal revokes sessions whose cookie is reused.",
         "data": {
           "session_token": "MyFitnessPal session cookie"
         }
@@ -19,7 +19,8 @@
         "title": "Update MyFitnessPal cookie",
         "data": {
           "session_token": "MyFitnessPal session cookie"
-        }
+        },
+        "description": "Open a private browser window and log in to MyFitnessPal, open developer tools → Storage/Application → Cookies, copy the value of `__Secure-next-auth.session-token`, then close the private window without logging out. Do not reuse this cookie anywhere else: MyFitnessPal revokes sessions whose cookie is reused."
       }
     },
     "error": {
