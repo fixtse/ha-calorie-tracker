@@ -19,6 +19,11 @@ diario = {
                  "icon": "mdi:chevron-right", "layout": "vertical", "primary_info": "name", "secondary_info": "none"},
             ]},
             {"type": "entities", "entities": [{"entity": "date.calorie_tracker_diary_date", "name": "Fecha"}]},
+            {"type": "custom:mushroom-template-card", "entity": "button.calorie_tracker_copy_day_to_today", "primary": "Copiar este día a hoy",
+             "secondary": "{% set d = states('date.calorie_tracker_diary_date') %}{% if d == now().date() | string %}Elige otro día para copiarlo{% else %}Registra las comidas del {{ d }} hoy{% endif %}",
+             "icon": "mdi:content-copy", "icon_color": "blue",
+             "tap_action": {"action": "perform-action", "perform_action": "button.press", "target": {"entity_id": "button.calorie_tracker_copy_day_to_today"},
+                            "confirmation": {"text": "¿Copiar todas las comidas de este día a hoy?"}}},
             {"type": "grid", "columns": 2, "square": False, "cards": [
                 tpl_card("Calorías", f"states('{SEL}') ~ ' kcal'", "mdi:fire", "deep-orange"),
                 tpl_card("Proteína", macros("protein", "g"), "mdi:food-steak", "red"),

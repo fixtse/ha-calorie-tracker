@@ -79,6 +79,24 @@
        ]
       },
       {
+       "type": "custom:mushroom-template-card",
+       "entity": "button.calorie_tracker_copy_day_to_today",
+       "primary": "Copiar este día a hoy",
+       "secondary": "{% set d = states('date.calorie_tracker_diary_date') %}{% if d == now().date() | string %}Elige otro día para copiarlo{% else %}Registra las comidas del {{ d }} hoy{% endif %}",
+       "icon": "mdi:content-copy",
+       "icon_color": "blue",
+       "tap_action": {
+        "action": "perform-action",
+        "perform_action": "button.press",
+        "target": {
+         "entity_id": "button.calorie_tracker_copy_day_to_today"
+        },
+        "confirmation": {
+         "text": "¿Copiar todas las comidas de este día a hoy?"
+        }
+       }
+      },
+      {
        "type": "grid",
        "columns": 2,
        "square": false,

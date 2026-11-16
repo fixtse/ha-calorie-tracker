@@ -63,7 +63,7 @@ curl -X POST -H "Authorization: Bearer $HA_TOKEN" -H "Content-Type: application/
 ## Dashboard
 
 `dashboard/` holds a two-view dashboard ("Calorías"): **Diario** has a day picker with
-previous/next/today buttons, that day's calories and macros, a per-meal breakdown, a table of
+previous/next/today buttons, a "copy this day to today" button, that day's calories and macros, a per-meal breakdown, a table of
 foods with portions and ingredients, and a 60-day calorie chart. **Recetas** is a searchable table
 of recipes and saved meals with their ingredients. It needs the Mushroom, flex-table-card and
 apexcharts-card frontend cards. Regenerate it with `python3 dashboard/build_dashboard.py`, and
@@ -119,6 +119,8 @@ All of these return data (`return_response`). Correctable errors come back as
 | `log_food` | Log `food_id` with `servings` or `quantity` + `unit`, or `name` + nutrients. `meal` accepts breakfast/desayuno, lunch/almuerzo, dinner/cena, snack |
 | `get_diary` | A day's entries and totals, or a range with daily averages |
 | `save_food` | Add or update a custom food |
+| `update_entry` | Change an entry's meal, time, name, portion or nutrients (edited MyFitnessPal entries survive re-syncs) |
+| `copy_day` | Copy a day (or some of its meals) to another day, today by default |
 | `delete_entries` | Remove diary entries |
 | `set_goals` / `get_goals` | Daily goals (0 removes one), weekly calorie budget, `recommend_since` date, today's progress |
 | `sync_myfitnesspal` | Import from MyFitnessPal |

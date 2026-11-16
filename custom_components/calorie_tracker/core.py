@@ -385,9 +385,62 @@ class Catalog:
         return entry
 
     def replace_imported(self, day: str, source: str, entries: list[dict[str, Any]]) -> None:
-        """Replace one day's entries from an external diary, so re-syncs never duplicate them."""
-        self.entries = [e for e in self.entries if not (e["day"] == day and e.get("source") == source)]
-        self.entries.extend({**entry, "source": source, "day": day} for entry in entries)
+        """Replace one day's entries from an external diary, so re-syncs never duplicate them.
+
+        Entries edited here are kept as edited; the incoming copy of them is ignored.
+        """
+        edited = {e["id"] for e in self.entries if e.get("edited")}
+        self.entries = [e for e in self.entries
+                        if e.get("edited") or not (e["day"] == day and e.get("source") == source)]
+        self.entries.extend({**entry, "source": source, "day": day} for entry in entries if entry["id"] not in edited)
+
+    def update_entry(self, entry_id: str, *, meal: str | None = None, eaten_at: datetime | None = None,
+                     name: str | None = None, servings: float | None = None, quantity: float | None = None,
+                     unit: str | None = None, values: dict | None = None) -> dict[str, Any]:
+        """Change one diary entry. A new portion recomputes nutrients from its food; values override them."""
+        entry = next((e for e in self.entries if e["id"] == entry_id), None)
+        if not entry:
+            raise KeyError("Entry not found; read the diary first")
+        changed = dict(entry)
+        if meal:
+            changed["meal"] = meal_key(meal)
+        if eaten_at:
+            changed["eaten_at"], changed["day"] = eaten_at.isoformat(), eaten_at.date().isoformat()
+        if name:
+            changed["name"] = name
+        if servings is not None or quantity is not None:
+            food = self.foods.get(entry.get("food_id") or "")
+            if not food:
+                raise ValueError("This entry has no catalog food; set calories and macros directly instead")
+            factor, changed["portion"] = self.factor(food, servings, quantity, unit)
+            changed["nutrients"] = scale(food["nutrients"], factor)
+        if values:
+            fixed = nutrients(values)
+            changed["nutrients"] = {k: fixed[k] if k in values else v for k, v in changed["nutrients"].items()}
+        changed["edited"] = True
+        entry.clear()
+        entry.update(changed)
+        return entry
+
+    def copy_day(self, source: str, target: str, meals: list[str] | None = None,
+                 to_meal: str | None = None) -> list[dict[str, Any]]:
+        """Log a copy of a day's entries (optionally some meals only) on another day, keeping times."""
+        wanted = {meal_key(m) for m in meals} if meals else None
+        items = sorted((e for e in self.entries if e["day"] == source and (not wanted or e["meal"] in wanted)),
+                       key=lambda e: e["eaten_at"])
+        if not items:
+            raise ValueError(f"Nothing to copy on {source}")
+        copies = []
+        for item in items:
+            clock = item["eaten_at"][10:] if len(item["eaten_at"]) > 10 else "T12:00:00"
+            copy = {k: v for k, v in item.items() if k not in ("source", "edited", "mfp_meal")}
+            copy.update(id=uuid.uuid4().hex[:12], day=target, eaten_at=target + clock, copied_from=source,
+                        meal=meal_key(to_meal) if to_meal else item["meal"], nutrients=dict(item["nutrients"]))
+            if item.get("food_id") in self.foods:
+                self.foods[item["food_id"]]["uses"] = self.foods[item["food_id"]].get("uses", 0) + 1
+            copies.append(copy)
+        self.entries.extend(copies)
+        return copies
 
     def history(self, days: list[str]) -> list[dict[str, Any]]:
         """Daily totals for the given days (missing days included with zero calories)."""

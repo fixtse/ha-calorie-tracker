@@ -60,5 +60,36 @@ class CatalogTest(unittest.TestCase):
         self.assertEqual(self.c.range("2026-11-01", "2026-11-30")["logged_days"], 1)
 
 
+    def test_update_entry_recomputes_and_overrides(self):
+        entry = self.log(meal="cena", food_id="egg", quantity=100, unit="g")
+        changed = self.c.update_entry(entry["id"], quantity=200, unit="g", meal="almuerzo")
+        self.assertEqual((changed["meal"], changed["nutrients"]["calories"], changed["portion"]), ("lunch", 102, "200 gramo"))
+        changed = self.c.update_entry(entry["id"], values={"protein": 30}, eaten_at=datetime(2026, 11, 14, 20))
+        self.assertEqual((changed["nutrients"]["protein"], changed["nutrients"]["calories"], changed["day"]), (30, 102, "2026-11-14"))
+        manual = self.log(meal="snack", name="Fruta", values={"calories": 80})
+        with self.assertRaises(ValueError):
+            self.c.update_entry(manual["id"], servings=2)
+        with self.assertRaises(KeyError):
+            self.c.update_entry("nope", meal="cena")
+
+    def test_edited_import_survives_resync(self):
+        imported = {"id": "mfp:1", "food_id": None, "name": "Pan", "meal": "breakfast", "portion": "1",
+                    "eaten_at": "2026-11-15T12:00:00", "nutrients": core.nutrients({"calories": 100})}
+        self.c.replace_imported("2026-11-15", "myfitnesspal", [imported])
+        self.c.update_entry("mfp:1", values={"calories": 150})
+        self.c.replace_imported("2026-11-15", "myfitnesspal", [imported])
+        kept = [e for e in self.c.entries if e["id"] == "mfp:1"]
+        self.assertEqual([e["nutrients"]["calories"] for e in kept], [150])
+
+    def test_copy_day(self):
+        self.log(meal="desayuno", food_id="egg", quantity=100, unit="g")
+        self.log(meal="cena", food_id="juane", servings=1)
+        copies = self.c.copy_day("2026-11-15", "2026-11-16", meals=["cena"])
+        self.assertEqual([(e["name"], e["day"], e["eaten_at"]) for e in copies], [("Juane", "2026-11-16", "2026-11-16T09:00:00")])
+        self.assertEqual(self.c.day("2026-11-16")["totals"]["calories"], 499)
+        with self.assertRaises(ValueError):
+            self.c.copy_day("2026-01-01", "2026-11-16")
+
+
 if __name__ == "__main__":
     unittest.main()

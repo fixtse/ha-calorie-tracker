@@ -232,6 +232,20 @@ class Tracker:
         )
 
     @callback
+    async def copy_day(self, source: str, target: str, meals: list[str] | None = None,
+                       to_meal: str | None = None) -> list[dict[str, Any]]:
+        """Copy entries between days; callers hold self.lock."""
+        if source == target and not to_meal:
+            raise ValueError("Pick a different day (or a different meal) to copy to")
+        copies = self.catalog.copy_day(source, target, meals, to_meal)
+        await self.save()
+        await self.check_alerts()
+        return copies
+
+    async def copy_shown_day_to_today(self) -> None:
+        async with self.lock:
+            await self.copy_day(self.shown_day(), self.today())
+
     def _remember_token(self, token: str) -> None:
         if token and token != self.entry.data.get(CONF_SESSION_TOKEN):
             self.hass.config_entries.async_update_entry(
@@ -351,6 +365,37 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             await t.save()
         return {"deleted": deleted}
 
+    async def update_entry(call: ServiceCall) -> ServiceResponse:
+        t = _tracker(hass)
+        values = {k: call.data[k] for k in ("calories", "protein", "carbohydrates", "fat", "fiber", "sugar", "sodium")
+                  if k in call.data}
+        eaten = call.data.get("eaten_at")
+        async with t.lock:
+            try:
+                old_day = next((e["day"] for e in t.catalog.entries if e["id"] == call.data["entry_id"]), None)
+                entry = t.catalog.update_entry(
+                    call.data["entry_id"], meal=call.data.get("meal"), name=call.data.get("name"),
+                    eaten_at=dt_util.as_local(eaten) if eaten else None, servings=call.data.get("servings"),
+                    quantity=call.data.get("quantity"), unit=call.data.get("unit"), values=values or None)
+            except (KeyError, ValueError) as error:
+                return _fail(call, error)
+            await t.save()
+            await t.check_alerts()
+        days = {d: t.catalog.day(d)["totals"] for d in {old_day, entry["day"]} if d}
+        return {"entry": entry, "day_totals": days}
+
+    async def copy_day(call: ServiceCall) -> ServiceResponse:
+        t = _tracker(hass)
+        target = call.data.get("to") or t.today()
+        async with t.lock:
+            try:
+                copies = await t.copy_day(call.data["from"], target, call.data.get("meals"), call.data.get("to_meal"))
+            except (KeyError, ValueError) as error:
+                return _fail(call, error)
+        return {"copied": len(copies), "day": target, "entries": [
+            {"entry_id": e["id"], "meal": e["meal"], "name": e["name"], "portion": e["portion"],
+             "calories": e["nutrients"]["calories"]} for e in copies], "day_totals": t.catalog.day(target)["totals"]}
+
     async def get_diary(call: ServiceCall) -> ServiceResponse:
         t = _tracker(hass)
         start = call.data.get("start") or t.today()
@@ -408,6 +453,18 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     }), supports_response=SupportsResponse.OPTIONAL)
     register(DOMAIN, "delete_entries", delete_entries, vol.Schema({
         vol.Required("entry_ids"): vol.All(cv.ensure_list, [cv.string], vol.Length(min=1, max=50)),
+    }), supports_response=SupportsResponse.OPTIONAL)
+    register(DOMAIN, "update_entry", update_entry, vol.Schema({
+        vol.Required("entry_id"): cv.string, vol.Optional("meal"): MEAL,
+        vol.Optional("name"): vol.All(cv.string, vol.Length(min=1, max=200)), **nutrients,
+        vol.Optional("servings"): vol.All(vol.Coerce(float), vol.Range(min=0.01, max=100)),
+        vol.Optional("quantity"): vol.All(vol.Coerce(float), vol.Range(min=0.01, max=100000)),
+        vol.Optional("unit"): vol.All(cv.string, vol.Length(max=50)),
+        vol.Optional("eaten_at"): cv.datetime,
+    }), supports_response=SupportsResponse.OPTIONAL)
+    register(DOMAIN, "copy_day", copy_day, vol.Schema({
+        vol.Required("from"): DAY, vol.Optional("to"): DAY,
+        vol.Optional("meals"): vol.All(cv.ensure_list, [MEAL]), vol.Optional("to_meal"): MEAL,
     }), supports_response=SupportsResponse.OPTIONAL)
     register(DOMAIN, "get_diary", get_diary, vol.Schema({
         vol.Optional("start"): DAY, vol.Optional("end"): DAY,

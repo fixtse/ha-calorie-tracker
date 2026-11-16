@@ -305,6 +305,90 @@
     "get_goals": {
       "name": "Get goals",
       "description": "Daily goals and today's progress."
+    },
+    "update_entry": {
+      "name": "Update diary entry",
+      "description": "Change an entry's meal, time, name, portion or nutrient values. A new portion recomputes nutrients from the food; given values override them. Edited MyFitnessPal entries are kept on re-sync.",
+      "fields": {
+        "entry_id": {
+          "name": "Entry ID",
+          "description": "Entry from get_diary."
+        },
+        "meal": {
+          "name": "Meal",
+          "description": "breakfast/desayuno, lunch/almuerzo, dinner/cena, snack"
+        },
+        "name": {
+          "name": "Name",
+          "description": "Name for a food not in the catalog"
+        },
+        "servings": {
+          "name": "Servings",
+          "description": "Multiples of the food's serving"
+        },
+        "quantity": {
+          "name": "Quantity",
+          "description": "Amount in unit, e.g. 250"
+        },
+        "unit": {
+          "name": "Unit",
+          "description": "e.g. g, ml, cup"
+        },
+        "calories": {
+          "name": "Calories",
+          "description": "kcal"
+        },
+        "protein": {
+          "name": "Protein",
+          "description": "grams"
+        },
+        "carbohydrates": {
+          "name": "Carbohydrates",
+          "description": "grams"
+        },
+        "fat": {
+          "name": "Fat",
+          "description": "grams"
+        },
+        "fiber": {
+          "name": "Fiber",
+          "description": "grams"
+        },
+        "sugar": {
+          "name": "Sugar",
+          "description": "grams"
+        },
+        "sodium": {
+          "name": "Sodium",
+          "description": "milligrams"
+        },
+        "eaten_at": {
+          "name": "Eaten at",
+          "description": "Defaults to now"
+        }
+      }
+    },
+    "copy_day": {
+      "name": "Copy day",
+      "description": "Log a copy of a day's entries on another day (today by default).",
+      "fields": {
+        "from": {
+          "name": "From",
+          "description": "Day to copy."
+        },
+        "to": {
+          "name": "To",
+          "description": "Target day; defaults to today."
+        },
+        "meals": {
+          "name": "Meals",
+          "description": "Only these meals; all if empty."
+        },
+        "to_meal": {
+          "name": "To meal",
+          "description": "Put every copied entry in this meal."
+        }
+      }
     }
   },
   "entity": {}

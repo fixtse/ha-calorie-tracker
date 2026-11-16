@@ -1,10 +1,12 @@
 """Sync button and diary day navigation buttons."""
 
+import asyncio
 from datetime import date, timedelta
 
 from homeassistant.components.button import ButtonEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
 
@@ -18,6 +20,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, add: AddEnt
         Button(t, "sync_myfitnesspal", "Sync MyFitnessPal", "mdi:cloud-download", lambda: t.start_sync()),
         Button(t, "previous_day", "Previous day", "mdi:chevron-left", lambda: t.select_day(_shift(t, -1))),
         Button(t, "next_day", "Next day", "mdi:chevron-right", lambda: t.select_day(_shift(t, 1))),
+        Button(t, "copy_to_today", "Copy day to today", "mdi:content-copy", t.copy_shown_day_to_today),
         Button(t, "today", "Today", "mdi:calendar-today", lambda: t.select_day(None)),
     ])
 
@@ -37,4 +40,9 @@ class Button(ButtonEntity):
         self._action = action
 
     async def async_press(self) -> None:
-        self._action()
+        try:
+            result = self._action()
+            if asyncio.iscoroutine(result):
+                await result
+        except ValueError as error:
+            raise HomeAssistantError(str(error)) from error
