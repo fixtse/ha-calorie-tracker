@@ -22,7 +22,10 @@ KINDS = ("food", "recipe", "meal")
 UNIT_ALIASES = {
     "g": "g", "gr": "g", "grs": "g", "gramm": "g", "gramme": "g", "grammes": "g", "gram": "g", "grams": "g", "gramo": "g", "gramos": "g", "gram(s)": "g",
     "ml": "ml", "milliliter": "ml", "milliliters": "ml", "mililitro": "ml", "mililitros": "ml",
-    "kg": "kg", "oz": "oz", "ounce": "oz", "ounces": "oz",
+    "kg": "kg", "kilo": "kg", "kilos": "kg", "kilogram": "kg", "kilograms": "kg", "kilogramo": "kg", "kilogramos": "kg",
+    "oz": "oz", "ounce": "oz", "ounces": "oz", "onza": "oz", "onzas": "oz",
+    "lb": "lb", "lbs": "lb", "pound": "lb", "pounds": "lb", "libra": "lb", "libras": "lb",
+    "l": "l", "liter": "l", "liters": "l", "litre": "l", "litres": "l", "litro": "l", "litros": "l",
     "serving": "serving", "servings": "serving", "serving(s)": "serving", "porcion": "serving",
     "porción": "serving", "racion": "serving", "ración": "serving",
     "unit": "unit", "units": "unit", "unidad": "unit", "unidades": "unit", "pieza": "unit",
@@ -31,6 +34,19 @@ UNIT_ALIASES = {
     "tbsp": "tbsp", "tablespoon": "tbsp", "cucharada": "tbsp", "cucharadas": "tbsp",
     "tsp": "tsp", "teaspoon": "tsp", "cucharadita": "tsp", "cucharaditas": "tsp",
 }
+
+
+# Size of each unit in the base unit of its kind (grams for weight, millilitres for volume).
+_WEIGHT = {"g": 1.0, "kg": 1000.0, "oz": 28.3495, "lb": 453.592}
+_VOLUME = {"ml": 1.0, "l": 1000.0}
+
+
+def _convert_family(have: str, want: str) -> tuple[float, float] | None:
+    """Sizes of `have` and `want` in their shared base unit, if they measure the same thing."""
+    for table in (_WEIGHT, _VOLUME):
+        if have in table and want in table:
+            return table[have], table[want]
+    return None
 
 
 def unit_key(unit: str) -> str:
@@ -349,14 +365,15 @@ class Catalog:
         for option in options:
             if unit_key(option["unit"]) == wanted and option["amount"] > 0:
                 return quantity / option["amount"] * option["multiplier"], f"{quantity:g} {option['unit']}"
-        # A weight serving can still convert between g and kg.
+        # A weight (or volume) serving converts to any other unit of the same kind: 30 g, 1 oz, 0.5 kg.
         for option in options:
-            pair = (unit_key(option["unit"]), wanted)
-            if pair in (("g", "kg"), ("kg", "g")) and option["amount"] > 0:
-                grams = quantity * (1000 if wanted == "kg" else 0.001)
-                return grams / option["amount"] * option["multiplier"], f"{quantity:g} {unit}"
+            family = _convert_family(unit_key(option["unit"]), wanted)
+            if family and option["amount"] > 0:
+                base_per_serving = option["amount"] * family[0]
+                return quantity * family[1] / base_per_serving * option["multiplier"], f"{quantity:g} {unit}"
         known = ", ".join(sorted({o["unit"] for o in options}))
-        raise ValueError(f"Unit '{unit}' is not available for this food; use one of: {known}, or servings")
+        raise ValueError(f"Unit '{unit}' is not available for this food; use one of: {known}, or servings "
+                         "(this food has no weight, so exact grams can't be computed; ask for its serving size instead)")
 
     # ---- diary ---------------------------------------------------------------------------
     def log(self, *, day: str, eaten_at: datetime, meal: str, food_id: str | None = None,

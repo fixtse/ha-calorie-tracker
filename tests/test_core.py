@@ -91,5 +91,16 @@ class CatalogTest(unittest.TestCase):
             self.c.copy_day("2026-01-01", "2026-11-16")
 
 
+    def test_exact_weights_convert_between_units(self):
+        c = self.c
+        for qty, unit, kcal in ((30, "g", 15.3), (50, "gramos", 25.5), (0.1, "kg", 51.0), (1, "oz", 14.5)):
+            entry = c.log(day="2026-11-15", eaten_at=datetime(2026, 11, 15, 9), meal="snack",
+                          food_id="egg", quantity=qty, unit=unit)
+            self.assertAlmostEqual(entry["nutrients"]["calories"], kcal, delta=0.1, msg=f"{qty} {unit}")
+        with self.assertRaises(ValueError) as error:
+            c.log(day="2026-11-15", eaten_at=datetime(2026, 11, 15, 9), meal="snack", food_id="juane", quantity=30, unit="g")
+        self.assertIn("no weight", str(error.exception))
+
+
 if __name__ == "__main__":
     unittest.main()
