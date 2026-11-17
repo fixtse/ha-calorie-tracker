@@ -129,3 +129,7 @@ MyFitnessPal has no public API. The integration uses the website's own endpoints
 change without notice. It only reads from MyFitnessPal; it never writes there.
 
 Tests: `python3 -B -m unittest discover -s tests` (no Home Assistant needed).
+
+## Saving recipes through Zero
+
+Ask Zero to create and save a recipe. Its `food_save` tool calls `save_food` with `kind: recipe`, `ingredients` (quantity-bearing strings), `instructions` (ordered steps), and `recipe_servings` (batch yield). Calories and other nutrients are **per listed serving**, not batch totals; estimates should be identified as such. Same name, brand, kind and serving unit updates the saved recipe. Recipes persist in the existing HA storage, independently of MyFitnessPal. Find them with `search_foods` (`kind: recipe`), retrieve full preparation details with `get_food`, and reuse them with `log_food` or `recommend_foods`. Saving does not log a diary entry.

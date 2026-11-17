@@ -104,3 +104,26 @@ class CatalogTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class RecipeTest(unittest.TestCase):
+    def test_recipe_persists_and_is_reusable(self):
+        catalog = core.Catalog()
+        plain = catalog.save_manual("Soup", "", 1, "serving", {"calories": 50})
+        recipe = catalog.save_manual("Soup", "", 1, "serving", {"calories": 200},
+                                     kind="recipe", ingredients=["400 g beans", "500 ml water"],
+                                     instructions=["Simmer for 20 minutes."], recipe_servings=4)
+        self.assertNotEqual(plain["id"], recipe["id"])
+        restored = core.Catalog.load(catalog.dump())
+        self.assertEqual(restored.search("Soup", "recipe", 0, 10)["total"], 1)
+        details = restored.food(recipe["id"])
+        self.assertEqual(details["ingredients"], ["400 g beans", "500 ml water"])
+        self.assertEqual(details["instructions"], ["Simmer for 20 minutes."])
+        self.assertEqual(details["recipe_servings"], 4)
+        entry = restored.log(day="2026-11-18", eaten_at=datetime(2026, 11, 18, 12),
+                             meal="lunch", food_id=recipe["id"], servings=2)
+        self.assertEqual(entry["nutrients"]["calories"], 400)
+        updated = restored.save_manual("Soup", "", 1, "serving", {"calories": 180},
+                                       kind="recipe", ingredients=["300 g beans"],
+                                       instructions=["Boil."], recipe_servings=3)
+        self.assertEqual(updated["id"], recipe["id"])
+        self.assertEqual(restored.search("Soup", "recipe", 0, 10)["total"], 1)

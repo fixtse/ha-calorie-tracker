@@ -131,12 +131,17 @@ class Catalog:
         self.foods[food["id"]] = stored
         return stored
 
-    def save_manual(self, name: str, brand: str, amount: float, unit: str, values: dict) -> dict:
+    def save_manual(self, name: str, brand: str, amount: float, unit: str, values: dict,
+                    kind: str = "food", ingredients: list[str] | None = None,
+                    instructions: list[str] | None = None, recipe_servings: float = 1) -> dict:
         food_id = "manual:" + slug(f"{brand} {name} {unit_key(unit)}")
+        if kind != "food":
+            food_id = f"manual-{kind}:" + slug(f"{brand} {name} {unit_key(unit)}")
         return self.upsert({
-            "id": food_id, "source": "manual", "kind": "food", "name": name.strip(),
+            "id": food_id, "source": "manual", "kind": kind, "name": name.strip(),
             "brand": brand.strip(), "serving_amount": amount, "serving_unit": unit.strip(),
-            "servings": [], "ingredients": [], "nutrients": nutrients(values),
+            "servings": [], "ingredients": ingredients or [], "nutrients": nutrients(values),
+            "instructions": instructions or [], "recipe_servings": recipe_servings,
             "saved": datetime.now().date().isoformat(),
         })
 
@@ -348,6 +353,7 @@ class Catalog:
         return {
             **self.brief(food), "source": food["source"], "nutrients_per_serving": food["nutrients"],
             "servings": food.get("servings", []), "ingredients": food.get("ingredients", []),
+            "instructions": food.get("instructions", []), "recipe_servings": food.get("recipe_servings", 1),
         }
 
     @staticmethod

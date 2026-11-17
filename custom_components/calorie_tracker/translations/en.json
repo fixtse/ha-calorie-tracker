@@ -259,6 +259,22 @@
         "sodium": {
           "name": "Sodium",
           "description": "milligrams"
+        },
+        "kind": {
+          "name": "Kind",
+          "description": "food, recipe or meal; defaults to food"
+        },
+        "ingredients": {
+          "name": "Ingredients",
+          "description": "Ingredient quantities for the complete recipe"
+        },
+        "instructions": {
+          "name": "Instructions",
+          "description": "Ordered preparation steps"
+        },
+        "recipe_servings": {
+          "name": "Recipe yield",
+          "description": "Total servings in the batch; nutrients remain per listed serving"
         }
       }
     },

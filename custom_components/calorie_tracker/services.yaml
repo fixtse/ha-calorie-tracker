@@ -66,6 +66,10 @@ get_diary:
     end: { selector: { date: } }
 save_food:
   fields:
+    kind: { selector: { select: { options: [food, recipe, meal] } } }
+    ingredients: { selector: { object: {} } }
+    instructions: { selector: { object: {} } }
+    recipe_servings: { selector: { number: { min: 0.001, max: 100000, mode: box } } }
     name: { required: true, selector: { text: } }
     brand: { selector: { text: } }
     serving_amount: { default: 1, selector: { number: { min: 0.001, max: 100000, mode: box } } }

@@ -415,7 +415,11 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
                   if k in call.data}
         async with t.lock:
             food = t.catalog.save_manual(call.data["name"], call.data.get("brand", ""),
-                                         call.data["serving_amount"], call.data["serving_unit"], values)
+                                         call.data["serving_amount"], call.data["serving_unit"], values,
+                                         kind=call.data.get("kind", "food"),
+                                         ingredients=call.data.get("ingredients"),
+                                         instructions=call.data.get("instructions"),
+                                         recipe_servings=call.data.get("recipe_servings", 1))
             await t.save()
         return {"food": t.catalog.brief(food)}
 
@@ -470,6 +474,10 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         vol.Optional("start"): DAY, vol.Optional("end"): DAY,
     }), supports_response=SupportsResponse.ONLY)
     register(DOMAIN, "save_food", save_food, vol.Schema({
+        **kind,
+        vol.Optional("ingredients"): vol.All([vol.All(cv.string, vol.Length(min=1, max=500))], vol.Length(max=100)),
+        vol.Optional("instructions"): vol.All([vol.All(cv.string, vol.Length(min=1, max=2000))], vol.Length(max=100)),
+        vol.Optional("recipe_servings"): vol.All(vol.Coerce(float), vol.Range(min=0.001, max=100000)),
         vol.Required("name"): vol.All(cv.string, vol.Length(min=1, max=200)),
         vol.Optional("brand", default=""): cv.string,
         vol.Optional("serving_amount", default=1): vol.All(vol.Coerce(float), vol.Range(min=0.001)),
