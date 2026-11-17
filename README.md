@@ -8,12 +8,20 @@ Zero reads and writes it through its services. The data lives in
 
 ## Install
 
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=fixtse&repository=ha-calorie-tracker&category=integration)
+
+Use the button to add the repository in HACS, install **Calorie Tracker**, then restart Home Assistant.
+
 **HACS:** HACS → ⋮ → Custom repositories → add `https://github.com/fixtse/ha-calorie-tracker`
 (type *Integration*), install **Calorie Tracker**, then restart Home Assistant.
 
 **Manual:** copy `custom_components/calorie_tracker` into `/config/custom_components/` and restart.
 
-Then go to **Settings → Devices & services → Add integration → Calorie Tracker**.
+After restarting, use this button to set up the integration:
+
+[![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=calorie_tracker)
+
+Or go to **Settings → Devices & services → Add integration → Calorie Tracker**.
 
 Works on its own, or with [Zero](https://github.com/fixtse/ha-zero-assistant), whose food tools
 call this integration's services.
