@@ -9,12 +9,20 @@ def dashboard(prefix):
         raise ValueError("Use the entity prefix shown in Home Assistant, e.g. alice")
     sensor = lambda suffix: f"sensor.{prefix}_{suffix}"
     history, estimate = sensor("tdee_history"), sensor("estimated_tdee")
-    weekly = """{% set weeks = state_attr('HISTORY', 'weeks') or [] %}
-| Week | Avg kg | Avg kcal | Δ kg | TDEE | Data |
-|---|---:|---:|---:|---:|---|
-{% for w in weeks | reverse %}
-| {{ w.week }} | {{ w.average_weight_kg | round(2) if w.average_weight_kg is not none else '—' }} | {{ w.average_calories | round(0) if w.average_calories is not none else '—' }} | {{ w.weight_change_kg | round(2) if w.weight_change_kg is not none else '—' }} | {{ w.smoothed_tdee | round(0) }} | {{ w.weight_days }}/7 weight days, {{ w.calorie_days }}/7 intake days{% if not w.complete %}, in progress{% endif %} |
-{% endfor %}""".replace("HISTORY", history)
+    weekly = {"type": "custom:flex-table-card", "title": "Weekly averages and TDEE",
+              "entities": {"include": history}, "sort_by": "Week-",
+              "css": {"tbody tr:nth-child(odd)": "background-color: rgba(127,127,127,0.06)"},
+              "columns": [
+                  {"name": "Week", "data": "weeks", "modify": "x.week", "align": "right"},
+                  {"name": "Start", "data": "weeks", "modify": "x.start"},
+                  {"name": "Avg kg", "data": "weeks", "modify": 'x.average_weight_kg == null ? "—" : x.average_weight_kg.toFixed(2)', "align": "right"},
+                  {"name": "Avg kcal", "data": "weeks", "modify": 'x.average_calories == null ? "—" : Math.round(x.average_calories)', "align": "right"},
+                  {"name": "Change kg", "data": "weeks", "modify": 'x.weight_change_kg == null ? "—" : x.weight_change_kg.toFixed(2)', "align": "right"},
+                  {"name": "TDEE", "data": "weeks", "modify": 'x.smoothed_tdee == null ? "—" : Math.round(x.smoothed_tdee)', "align": "right"},
+                  {"name": "Weight days", "data": "weeks", "modify": 'x.weight_days + "/7"', "align": "right"},
+                  {"name": "Intake days", "data": "weeks", "modify": 'x.calorie_days + "/7"', "align": "right"},
+                  {"name": "Status", "data": "weeks", "modify": '!x.complete ? "In progress" : x.eligible ? "Complete" : "Incomplete data"'},
+              ]}
     summary = """{% set phase = state_attr('ESTIMATE', 'status') %}
 {% set labels = {'disabled': 'Tracking disabled', 'waiting_for_body_stats': 'Waiting for starting weight and body fat', 'waiting_for_start_date': 'Waiting for the starting date', 'initial_estimate': 'Initial estimate (calibration in progress)', 'adaptive': 'Based on completed weight and intake weeks', 'invalid_targets': 'Adjust the weekly goal: no valid calorie or macro targets'} %}
 **Phase:** {{ labels.get(phase, 'Measurements not available') }}
@@ -39,7 +47,7 @@ Positive weekly change means gain; negative means loss. Keep starting body stats
                       {"type": "entities", "title": "TDEE and daily requirements", "entities": [estimate, sensor("tracked_weight")] +
                        [sensor("adaptive_" + key + "_target") for key in ("calories", "protein", "fat", "carbohydrates")]},
                       {"type": "markdown", "content": summary}, charts,
-                      {"type": "markdown", "title": "Weekly averages and TDEE", "content": weekly}]}]}
+                      weekly]}]}
 
 
 if __name__ == "__main__":

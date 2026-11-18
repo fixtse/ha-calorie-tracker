@@ -81,6 +81,9 @@ async def verify_tdee(hass, alice, bob, module):
     spec.loader.exec_module(builder)
     await hass.async_block_till_done()
     definition = builder.dashboard("alice")
+    weekly_table = definition["views"][0]["cards"][-1]
+    assert weekly_table["type"] == "custom:flex-table-card"
+    assert all(column["data"] == "weeks" for column in weekly_table["columns"])
     for card in definition["views"][0]["cards"]:
         if card["type"] == "markdown":
             rendered = Template(card["content"], hass).async_render()

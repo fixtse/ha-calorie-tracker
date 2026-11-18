@@ -57,7 +57,7 @@ macros or nonpositive calories are unavailable and never replace manual goals.
 | AY28:AY130, Q4, J15 | First week displayed but excluded from adaptation. Average eligible weekly TDEE values from week two onward. Initial estimate stays active until three weeks have completed and at least two calibration weeks exist; only completed weeks calibrate the headline. |
 | Q6, Q9              | Daily energy adjustment = weekly goal in kg × **7700 / 7**; add it to estimated TDEE. Keep this separate from the 7716.17 conversion above.                                                                                                                        |
 | Q10, T10            | Protein: starting weight × 2.2 g/kg below 20% body fat; × 1.76 from 20% through 25%; × 1.606 above 25%. Ranges: 1.76–2.64 below 20%, 1.606–2.2 otherwise.                                                                                                          |
-| Q11, T11            | Fat: 22% of target calories below 25% body fat, 25% otherwise, divided by 9 kcal/g. Range: 15–30% of calories.                                                                                                                                                     |
+| Q11, T11            | Fat: 25% of target calories, matching the supplied workbook configuration, divided by 9 kcal/g. Range: 15–30% of calories.                                                                                                                                         |
 | Q12, T12            | Carbs = remaining target energy after protein (4 kcal/g) and fat (9 kcal/g), divided by 4. Range: 80–120% of that result.                                                                                                                                          |
 
 The baseline model uses the sheet's fixed 1.5 activity multiplier, not a scale's BMR reading.
@@ -67,9 +67,9 @@ selected scale's body-fat sensor. These are model estimates, not measurements of
 ### Intentional corrections to the exported sheet
 
 Some formulas are exported as `__xludf.DUMMYFUNCTION` with frozen cached values. The port
-implements their underlying logic directly. The fat formula also compares an empty optional
-body-fat cell before the entered body fat, which can select 25% unexpectedly. The port uses
-the numeric starting body-fat percentage and the intended 22%/25% bands.
+implements their underlying logic directly. The supplied workbook allocates 25% of calories
+to fat. The port preserves that allocation, and assigns the remaining calories to carbs,
+so the fat and carbohydrate targets match the workbook outputs.
 
 The spreadsheet forward-fills missing intake cells, including a reference to an unrelated
 cell for one first-day fallback. This port never invents food intake: a week needs **seven
@@ -86,8 +86,8 @@ Copy [the ready-to-edit example](../dashboard/tdee-example.json), or generate a 
 
 The generated dashboard contains editable tracking/goal controls, estimated TDEE, current
 weight, daily calorie/protein/fat/carb targets, acceptable ranges, a daily weight/intake chart,
-and a weekly averages/change/TDEE table. It needs apexcharts-card for the combined chart;
-all remaining cards are native. This is separate from the existing diary/recipes dashboard.
+and a weekly averages/change/TDEE table. It uses apexcharts-card for the combined chart and
+custom:flex-table-card for the weekly table. Other cards are native. This is separate from the existing diary/recipes dashboard.
 
 ```sh
 python dashboard/build_tdee_dashboard.py --prefix alice > calculations-dashboard.json

@@ -73,9 +73,69 @@
           ]
         },
         {
-          "type": "markdown",
+          "type": "custom:flex-table-card",
           "title": "Weekly averages and TDEE",
-          "content": "{% set weeks = state_attr('sensor.calorie_tracker_tdee_history', 'weeks') or [] %}\n| Week | Avg kg | Avg kcal | \u0394 kg | TDEE | Data |\n|---|---:|---:|---:|---:|---|\n{% for w in weeks | reverse %}\n| {{ w.week }} | {{ w.average_weight_kg | round(2) if w.average_weight_kg is not none else '\u2014' }} | {{ w.average_calories | round(0) if w.average_calories is not none else '\u2014' }} | {{ w.weight_change_kg | round(2) if w.weight_change_kg is not none else '\u2014' }} | {{ w.smoothed_tdee | round(0) }} | {{ w.weight_days }}/7 weight days, {{ w.calorie_days }}/7 intake days{% if not w.complete %}, in progress{% endif %} |\n{% endfor %}"
+          "entities": {
+            "include": "sensor.calorie_tracker_tdee_history"
+          },
+          "sort_by": "Week-",
+          "css": {
+            "tbody tr:nth-child(odd)": "background-color: rgba(127,127,127,0.06)"
+          },
+          "columns": [
+            {
+              "name": "Week",
+              "data": "weeks",
+              "modify": "x.week",
+              "align": "right"
+            },
+            {
+              "name": "Start",
+              "data": "weeks",
+              "modify": "x.start"
+            },
+            {
+              "name": "Avg kg",
+              "data": "weeks",
+              "modify": "x.average_weight_kg == null ? \"\u2014\" : x.average_weight_kg.toFixed(2)",
+              "align": "right"
+            },
+            {
+              "name": "Avg kcal",
+              "data": "weeks",
+              "modify": "x.average_calories == null ? \"\u2014\" : Math.round(x.average_calories)",
+              "align": "right"
+            },
+            {
+              "name": "Change kg",
+              "data": "weeks",
+              "modify": "x.weight_change_kg == null ? \"\u2014\" : x.weight_change_kg.toFixed(2)",
+              "align": "right"
+            },
+            {
+              "name": "TDEE",
+              "data": "weeks",
+              "modify": "x.smoothed_tdee == null ? \"\u2014\" : Math.round(x.smoothed_tdee)",
+              "align": "right"
+            },
+            {
+              "name": "Weight days",
+              "data": "weeks",
+              "modify": "x.weight_days + \"/7\"",
+              "align": "right"
+            },
+            {
+              "name": "Intake days",
+              "data": "weeks",
+              "modify": "x.calorie_days + \"/7\"",
+              "align": "right"
+            },
+            {
+              "name": "Status",
+              "data": "weeks",
+              "modify": "!x.complete ? \"In progress\" : x.eligible ? \"Complete\" : \"Incomplete data\""
+            }
+          ]
         }
       ]
     }

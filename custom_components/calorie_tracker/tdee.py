@@ -24,10 +24,11 @@ def kilograms(value, unit):
 
 
 def macros(tdee, weight, body_fat, weekly_goal):
-    """Q6, Q9:Q12 and T10:T12, with numeric body-fat comparisons."""
+    """Q6, Q9:Q12 and T10:T12, matching the supplied workbook configuration."""
     calories = tdee + weekly_goal * 7700 / 7
     protein = weight * (2.2 if body_fat < 20 else 1.76 if body_fat <= 25 else 1.606)
-    fat = calories * (.22 if body_fat < 25 else .25) / 9
+    # Q11 in the supplied workbook allocates 25% of calories to fat.
+    fat = calories * .25 / 9
     carbs = (calories - protein * 4 - fat * 9) / 4
     targets = {"calories": calories, "protein": protein, "fat": fat, "carbohydrates": carbs}
     if any(not isfinite(v) or v < 0 for v in targets.values()) or calories <= 0:

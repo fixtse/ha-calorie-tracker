@@ -19,8 +19,8 @@ class TDEETest(unittest.TestCase):
         self.assertAlmostEqual(result["tdee"], expected)
         self.assertAlmostEqual(result["targets"]["calories"], expected - 275)
         self.assertEqual(result["targets"]["protein"], 176)
-        self.assertAlmostEqual(result["targets"]["fat"], (expected - 275) * .22 / 9)
-        for fat, protein_factor, fat_factor in ((19.99, 2.2, .22), (20, 1.76, .22),
+        self.assertAlmostEqual(result["targets"]["fat"], (expected - 275) * .25 / 9)
+        for fat, protein_factor, fat_factor in ((19.99, 2.2, .25), (20, 1.76, .25),
                                                 (25, 1.76, .25), (25.01, 1.606, .25)):
             targets, ranges = tdee.macros(expected, 80, fat, 0)
             self.assertAlmostEqual(targets["protein"], 80 * protein_factor)
