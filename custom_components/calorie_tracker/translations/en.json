@@ -26,7 +26,8 @@
     },
     "error": {
       "invalid_auth": "MyFitnessPal rejected this cookie. Log in again and copy a fresh value.",
-      "cannot_connect": "Could not reach MyFitnessPal."
+      "cannot_connect": "Could not reach MyFitnessPal.",
+      "invalid_name": "Enter a name between 1 and 100 characters."
     },
     "abort": {
       "already_configured": "Already configured",

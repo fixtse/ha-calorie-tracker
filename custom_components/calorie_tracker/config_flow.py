@@ -44,16 +44,19 @@ class CalorieTrackerConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             token = user_input.get(CONF_SESSION_TOKEN, "").strip()
             error = None
-            if token:
+            name = user_input.get("name", "").strip()
+            if not 1 <= len(name) <= 100:
+                errors["name"] = "invalid_name"
+            elif token:
                 error, token = await _check(token)
             if error:
                 errors["base"] = error
-            else:
-                return self.async_create_entry(title=user_input["name"].strip(),
+            elif not errors:
+                return self.async_create_entry(title=name,
                                               data={CONF_SESSION_TOKEN: token, "storage_key": f"{DOMAIN}.{uuid4().hex}"})
         return self.async_show_form(
             step_id="user", data_schema=vol.Schema({
-                vol.Required("name"): vol.All(str, str.strip, vol.Length(min=1, max=100)),
+                vol.Required("name"): selector.TextSelector(),
                 vol.Optional(CONF_SESSION_TOKEN): TOKEN}), errors=errors)
 
     async def async_step_reauth(self, entry_data: Mapping[str, Any]) -> ConfigFlowResult:

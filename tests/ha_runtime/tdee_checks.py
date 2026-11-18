@@ -62,7 +62,12 @@ async def verify_tdee(hass, alice, bob, module):
     after = (await call("get_goals", user_id=alice.entry_id))["goals"]["calories"]
     assert abs(after - before - 275) < .01, (before, after)
     assert alice.runtime_data.adaptive.result()["summary"]["initial_weight_kg"] == 80
-    assert not bob.runtime_data.adaptive.result()["summary"]["auto_goals"]
+    bob_summary = bob.runtime_data.adaptive.result()["summary"]
+    assert not bob_summary["auto_goals"]
+    assert bob_summary["weekly_goal_kg"] == 0
+    assert bob_summary["initial_weight_kg"] == 90
+    assert bob.runtime_data.adaptive.entities()["weight"] == sensors[1]["weight"]
+    assert bob.runtime_data.adaptive.state is not alice.runtime_data.adaptive.state
     await call("set_goals", user_id=alice.entry_id, protein=130)
     assert not alice.runtime_data.adaptive.result()["summary"]["auto_goals"]
     assert (await call("get_goals", user_id=alice.entry_id))["goals"]["protein"] == 130

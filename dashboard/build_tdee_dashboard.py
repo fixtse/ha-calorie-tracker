@@ -9,15 +9,15 @@ def dashboard(prefix):
         raise ValueError("Use the entity prefix shown in Home Assistant, e.g. alice")
     sensor = lambda suffix: f"sensor.{prefix}_{suffix}"
     history, estimate = sensor("tdee_history"), sensor("estimated_tdee")
-    weekly = {"type": "custom:flex-table-card", "title": "Weekly averages and TDEE",
+    weekly = {"type": "custom:flex-table-card", "title": "Weekly recorded averages and TDEE",
               "entities": {"include": history}, "sort_by": "Week-",
               "css": {"tbody tr:nth-child(odd)": "background-color: rgba(127,127,127,0.06)"},
               "columns": [
                   {"name": "Week", "data": "weeks", "modify": "x.week", "align": "right"},
                   {"name": "Start", "data": "weeks", "modify": "x.start"},
-                  {"name": "Avg kg", "data": "weeks", "modify": 'x.average_weight_kg == null ? "—" : x.average_weight_kg.toFixed(2)', "align": "right"},
+                  {"name": "Recorded avg kg", "data": "weeks", "modify": 'x.average_weight_kg == null ? "—" : x.average_weight_kg.toFixed(2)', "align": "right"},
                   {"name": "Avg kcal", "data": "weeks", "modify": 'x.average_calories == null ? "—" : Math.round(x.average_calories)', "align": "right"},
-                  {"name": "Change kg", "data": "weeks", "modify": 'x.weight_change_kg == null ? "—" : x.weight_change_kg.toFixed(2)', "align": "right"},
+                  {"name": "Recorded change kg", "data": "weeks", "modify": 'x.weight_change_kg == null ? "—" : x.weight_change_kg.toFixed(2)', "align": "right"},
                   {"name": "TDEE", "data": "weeks", "modify": 'x.smoothed_tdee == null ? "—" : Math.round(x.smoothed_tdee)', "align": "right"},
                   {"name": "Weight days", "data": "weeks", "modify": 'x.weight_days + "/7"', "align": "right"},
                   {"name": "Intake days", "data": "weeks", "modify": 'x.calorie_days + "/7"', "align": "right"},
@@ -29,7 +29,9 @@ def dashboard(prefix):
 
 **Calibrated weeks:** {{ state_attr('ESTIMATE', 'calibration_weeks') or 0 }}
 
-Positive weekly change means gain; negative means loss. Keep starting body stats fixed. Log complete diary days; finished weeks need at least four logged days for calibration.
+Positive weekly change means gain; negative means loss. Keep starting body stats fixed. Log complete diary days; finished weeks need at least four logged days for calibration. Up to three missing intake days are allowed; use only available intake days. Targets use the latest eligible completed week, never the current partial week.
+
+The weight average and change shown in the table use recorded weights only. TDEE uses the spreadsheet’s separate carry-forward weight calculation.
 
 {% set ranges = state_attr('ESTIMATE', 'ranges') %}
 {% if ranges %}**Macro ranges (g):** Protein {{ ranges.protein[0] | round }}–{{ ranges.protein[1] | round }}, fat {{ ranges.fat[0] | round }}–{{ ranges.fat[1] | round }}, carbs {{ ranges.carbohydrates[0] | round }}–{{ ranges.carbohydrates[1] | round }}.{% endif %}""".replace("ESTIMATE", estimate)

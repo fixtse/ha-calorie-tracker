@@ -99,7 +99,23 @@ curl -X POST -H "Authorization: Bearer $HA_TOKEN" -H "Content-Type: application/
 previous/next/today buttons, a "copy this day to today" button, that day's calories and macros, a per-meal breakdown, a table of
 foods with portions and ingredients, and a 60-day calorie chart. **Recetas** is a searchable table
 of recipes and saved meals with their ingredients. It needs the Mushroom, flex-table-card and
-apexcharts-card frontend cards. Regenerate it with `python3 dashboard/build_dashboard.py`, and
+apexcharts-card frontend cards. Diario also includes per-user adaptive TDEE controls, targets,
+a weight/intake chart and a `custom:flex-table-card` weekly table. The table shows recorded
+weight averages/change, calorie/weight day coverage, and skipped/partial week status.
+
+Generate it for the user's actual entity prefix (check Developer Tools → States):
+
+```sh
+python3 dashboard/build_dashboard.py --prefix alice --output alice-dashboard.json
+```
+
+For the original installation, the default prefix is `calorie_tracker`. Each dashboard must
+reference only its selected user's entities; a dashboard is not an access-control boundary.
+TDEE, scale selection, weight history, weekly change goal and automatic goals are all per
+Calorie Tracker user. New users start with adaptive tracking and automatic goals disabled.
+See [the formula and dashboard guide](docs/adaptive-tdee.md) for the standalone example.
+
+Regenerate the default example with `python3 dashboard/build_dashboard.py`, and
 install it with `install_dashboard.py` inside the HA container (pass a token on stdin).
 
 ## Entities

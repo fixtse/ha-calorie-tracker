@@ -1,4 +1,9 @@
+import argparse
 import json
+from pathlib import Path
+import re
+
+from build_tdee_dashboard import dashboard as tdee_dashboard
 SEL = "sensor.calorie_tracker_selected_day"
 def tpl_card(name, expr, icon, color):
     return {"type": "custom:mushroom-template-card", "primary": name, "icon": icon, "icon_color": color,
@@ -96,4 +101,24 @@ def fix(o):
     elif isinstance(o, list):
         for v in o: fix(v)
 fix(diario)
-json.dump({"title": "Calorías", "views": [diario, recetas]}, open("dashboard.json", "w"), ensure_ascii=False, indent=1)
+
+
+def dashboard(prefix="calorie_tracker"):
+    if not re.fullmatch(r"[a-z0-9_]+", prefix):
+        raise ValueError("Use the entity prefix shown in Home Assistant")
+    definition = json.loads(json.dumps({"title": "Calorías", "views": [diario, recetas]}).replace(
+        "calorie_tracker_", prefix + "_"))
+    cards = tdee_dashboard(prefix)["views"][0]["cards"]
+    definition["views"][0]["sections"].extend([
+        {"type": "grid", "cards": cards[:3]},
+        {"type": "grid", "cards": cards[3:]},
+    ])
+    return definition
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Generate a per-user diary, recipes and TDEE dashboard.")
+    parser.add_argument("--prefix", default="calorie_tracker", help="Entity prefix shown in HA")
+    parser.add_argument("--output", type=Path, default=Path(__file__).with_name("dashboard.json"))
+    args = parser.parse_args()
+    args.output.write_text(json.dumps(dashboard(args.prefix), ensure_ascii=False, indent=2) + "\n")

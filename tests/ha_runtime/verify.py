@@ -11,6 +11,7 @@ from homeassistant.bootstrap import async_setup_hass
 from homeassistant.runner import RuntimeConfig
 from homeassistant.setup import async_setup_component
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.data_entry_flow import FlowManagerIndexView
 from homeassistant.exceptions import ServiceValidationError
 
 
@@ -40,9 +41,19 @@ async def main():
             for name in ("Alice", "Bob"):
                 flow = await hass.config_entries.flow.async_init("calorie_tracker", context={"source": "user"})
                 assert flow["type"] == "form", flow
-                result = await hass.config_entries.flow.async_configure(flow["flow_id"], {"name": name})
+                # The browser serializes the form before submission; direct flow tests alone
+                # miss validators that cannot cross the HTTP API (such as str.strip).
+                serialized = FlowManagerIndexView(hass.config_entries.flow)._prepare_result_json(flow)
+                json.dumps(serialized)
+                assert any(field["name"] == "name" for field in serialized["data_schema"])
+                for invalid in ("   ", "x" * 101):
+                    rejected = await hass.config_entries.flow.async_configure(flow["flow_id"], {"name": invalid})
+                    assert rejected["type"] == "form" and rejected["errors"]["name"] == "invalid_name", rejected
+                    json.dumps(FlowManagerIndexView(hass.config_entries.flow)._prepare_result_json(rejected))
+                result = await hass.config_entries.flow.async_configure(flow["flow_id"], {"name": f" {name} "})
                 assert result["type"] == "create_entry", result
                 entry = result["result"]
+                assert entry.title == name
                 await hass.async_block_till_done()
                 entries.append(entry)
             alice, bob = entries

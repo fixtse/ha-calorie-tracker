@@ -5,6 +5,10 @@ It does not import the workbook, its measurements, the SUMMARY sheet or workout 
 All settings and weight history belong to one Calorie Tracker user. Both tracking and
 automatic goals default to off.
 
+Each tracker entry has its own scale mapping, baseline, measurements, diary, weekly goal,
+TDEE calculation and automatic-goals switch. Configuring one user does not enable or change
+another user's settings. Dashboard examples must use that user's entity prefix.
+
 ## Connect a scale
 
 Open the Calorie Tracker user's **Configure → Adaptive TDEE and scale** options.
@@ -52,7 +56,7 @@ macros or nonpositive calories are unavailable and never replace manual goals.
 | Sheet cells         | Ported behavior                                                                                                                                                                                                                                                    |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | G5:G9, AM18         | Internal kg. Initial TDEE = `(370 + 21.6 × starting_weight_kg × (1 − starting_body_fat / 100)) × 1.5`.                                                                                                                                                             |
-| E26:K131, AV:AW     | Seven-day weeks anchored to the starting date. Weekly average weights and change from the preceding week's average. Missing within-week weights carry forward for the average, but remain absent in daily history.                                                 |
+| E26:K131, AV:AW     | Seven-day weeks anchored to the starting date. Internal average weights and change from the preceding week's helper average. Missing within-week weights carry forward for the average, but remain absent in daily history.                                        |
 | BB26, AZ26:AZ130    | Weekly measured TDEE = average daily intake minus weekly weight change × **7716.17 / 7**. The sheet derives 7716.17 from 3500 × 2.20462.                                                                                                                           |
 | AY28:AY130, Q4, J15 | First week displayed but excluded from adaptation. Average eligible weekly TDEE values from week two onward. Initial estimate stays active until three weeks have completed and at least two calibration weeks exist; only completed weeks calibrate the headline. |
 | Q6, Q9              | Daily energy adjustment = weekly goal in kg × **7700 / 7**; add it to estimated TDEE. Keep this separate from the 7716.17 conversion above.                                                                                                                        |
@@ -110,3 +114,5 @@ attributes. For older data, `calorie_tracker.get_tdee` supports `kind: days|week
 and `limit` (1–53); results are newest first. All services accept the selected tracker user ID.
 
 The weekly table averages only recorded weights and compares with the preceding recorded weekly average (CALCULATIONS L/R). The expenditure calculation separately carries weights forward over missing days (AV/AW); history exposes these helper values as `tdee_average_weight_kg` and `tdee_weight_change_kg`.
+
+The combined [Diario and recipes generator](../dashboard/build_dashboard.py) also includes these controls, chart and flex table. Use `--prefix alice --output alice-dashboard.json` to generate a separate dashboard for another user. Visible weight averages/change match CALCULATIONS L/R; the TDEE helper averages remain separate. The headline uses the latest eligible completed week with at least four logged calorie days, as selected for this integration, rather than the workbook’s penultimate populated result.
