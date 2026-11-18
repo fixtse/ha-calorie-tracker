@@ -5,7 +5,8 @@
         "title": "Calorie Tracker",
         "description": "Optional: paste a MyFitnessPal session cookie to import your foods, meals, recipes and diary history. Open a private browser window and log in to MyFitnessPal, open developer tools → Storage/Application → Cookies, copy the value of `__Secure-next-auth.session-token`, then close the private window without logging out. Do not reuse this cookie anywhere else: MyFitnessPal revokes sessions whose cookie is reused.",
         "data": {
-          "session_token": "MyFitnessPal session cookie"
+          "session_token": "MyFitnessPal session cookie",
+          "name": "User name"
         }
       },
       "reauth_confirm": {
@@ -67,6 +68,10 @@
         "limit": {
           "name": "Limit",
           "description": "Maximum results"
+        },
+        "user_id": {
+          "name": "User",
+          "description": "Calorie Tracker config entry ID. Required when multiple users are configured."
         }
       }
     },
@@ -77,6 +82,10 @@
         "food_id": {
           "name": "Food ID",
           "description": "ID from search"
+        },
+        "user_id": {
+          "name": "User",
+          "description": "Calorie Tracker config entry ID. Required when multiple users are configured."
         }
       }
     },
@@ -123,6 +132,10 @@
         "since": {
           "name": "Since",
           "description": "Only foods eaten on or after this date; overrides the saved setting, empty disables it"
+        },
+        "user_id": {
+          "name": "User",
+          "description": "Calorie Tracker config entry ID. Required when multiple users are configured."
         }
       }
     },
@@ -185,6 +198,10 @@
         "eaten_at": {
           "name": "Eaten at",
           "description": "Defaults to now"
+        },
+        "user_id": {
+          "name": "User",
+          "description": "Calorie Tracker config entry ID. Required when multiple users are configured."
         }
       }
     },
@@ -195,6 +212,10 @@
         "entry_ids": {
           "name": "Entry IDs",
           "description": "IDs from get_diary"
+        },
+        "user_id": {
+          "name": "User",
+          "description": "Calorie Tracker config entry ID. Required when multiple users are configured."
         }
       }
     },
@@ -209,6 +230,10 @@
         "end": {
           "name": "End",
           "description": "Optional end of range"
+        },
+        "user_id": {
+          "name": "User",
+          "description": "Calorie Tracker config entry ID. Required when multiple users are configured."
         }
       }
     },
@@ -275,6 +300,10 @@
         "recipe_servings": {
           "name": "Recipe yield",
           "description": "Total servings in the batch; nutrients remain per listed serving"
+        },
+        "user_id": {
+          "name": "User",
+          "description": "Calorie Tracker config entry ID. Required when multiple users are configured."
         }
       }
     },
@@ -285,6 +314,10 @@
         "since": {
           "name": "Since",
           "description": "Rescan the diary from this date"
+        },
+        "user_id": {
+          "name": "User",
+          "description": "Calorie Tracker config entry ID. Required when multiple users are configured."
         }
       }
     },
@@ -315,12 +348,22 @@
         "recommend_since": {
           "name": "Recommend only foods eaten since",
           "description": "Recommendations only include foods eaten on or after this date (e.g. since moving); empty removes it"
+        },
+        "user_id": {
+          "name": "User",
+          "description": "Calorie Tracker config entry ID. Required when multiple users are configured."
         }
       }
     },
     "get_goals": {
       "name": "Get goals",
-      "description": "Daily goals and today's progress."
+      "description": "Daily goals and today's progress.",
+      "fields": {
+        "user_id": {
+          "name": "User",
+          "description": "Calorie Tracker config entry ID. Required when multiple users are configured."
+        }
+      }
     },
     "update_entry": {
       "name": "Update diary entry",
@@ -381,6 +424,10 @@
         "eaten_at": {
           "name": "Eaten at",
           "description": "Defaults to now"
+        },
+        "user_id": {
+          "name": "User",
+          "description": "Calorie Tracker config entry ID. Required when multiple users are configured."
         }
       }
     },
@@ -403,6 +450,28 @@
         "to_meal": {
           "name": "To meal",
           "description": "Put every copied entry in this meal."
+        },
+        "user_id": {
+          "name": "User",
+          "description": "Calorie Tracker config entry ID. Required when multiple users are configured."
+        }
+      }
+    },
+    "list_users": {
+      "name": "List users",
+      "description": "List configured calorie tracker users with search and pagination. IDs identify config entries.",
+      "fields": {
+        "search": {
+          "name": "Search"
+        },
+        "id": {
+          "name": "Id"
+        },
+        "offset": {
+          "name": "Offset"
+        },
+        "limit": {
+          "name": "Limit"
         }
       }
     }

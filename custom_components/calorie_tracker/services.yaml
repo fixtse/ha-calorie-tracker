@@ -1,32 +1,59 @@
 search_foods:
   fields:
-    query: { example: "huevo", selector: { text: } }
+    user_id: { selector: { text } }
+    query: { example: "huevo", selector: { text } }
     kind: { selector: { select: { options: [food, recipe, meal] } } }
-    offset: { default: 0, selector: { number: { min: 0, max: 100000, mode: box } } }
+    offset:
+      { default: 0, selector: { number: { min: 0, max: 100000, mode: box } } }
     limit: { default: 10, selector: { number: { min: 1, max: 50 } } }
 get_food:
   fields:
-    food_id: { required: true, selector: { text: } }
+    user_id: { selector: { text } }
+    food_id: { required: true, selector: { text } }
 recommend_foods:
   fields:
-    calories: { selector: { number: { min: 0, max: 5000, unit_of_measurement: kcal, mode: box } } }
-    protein: { selector: { number: { min: 0, max: 500, unit_of_measurement: g, mode: box } } }
-    carbohydrates: { selector: { number: { min: 0, max: 1000, unit_of_measurement: g, mode: box } } }
-    fat: { selector: { number: { min: 0, max: 500, unit_of_measurement: g, mode: box } } }
+    user_id: { selector: { text } }
+    calories:
+      {
+        selector:
+          {
+            number: { min: 0, max: 5000, unit_of_measurement: kcal, mode: box },
+          },
+      }
+    protein:
+      {
+        selector:
+          { number: { min: 0, max: 500, unit_of_measurement: g, mode: box } },
+      }
+    carbohydrates:
+      {
+        selector:
+          { number: { min: 0, max: 1000, unit_of_measurement: g, mode: box } },
+      }
+    fat:
+      {
+        selector:
+          { number: { min: 0, max: 500, unit_of_measurement: g, mode: box } },
+      }
     kind: { selector: { select: { options: [food, recipe, meal] } } }
-    query: { selector: { text: } }
-    meal: { example: cena, selector: { text: } }
-    respect_goals: { default: true, selector: { boolean: } }
-    since: { selector: { date: } }
+    query: { selector: { text } }
+    meal: { example: cena, selector: { text } }
+    respect_goals: { default: true, selector: { boolean } }
+    since: { selector: { date } }
     limit: { default: 5, selector: { number: { min: 1, max: 20 } } }
 log_food:
   fields:
-    meal: { required: true, example: cena, selector: { text: } }
-    food_id: { selector: { text: } }
-    servings: { selector: { number: { min: 0.01, max: 100, step: 0.01, mode: box } } }
-    quantity: { selector: { number: { min: 0.01, max: 100000, step: 0.01, mode: box } } }
-    unit: { example: g, selector: { text: } }
-    name: { selector: { text: } }
+    user_id: { selector: { text } }
+    meal: { required: true, example: cena, selector: { text } }
+    food_id: { selector: { text } }
+    servings:
+      { selector: { number: { min: 0.01, max: 100, step: 0.01, mode: box } } }
+    quantity:
+      {
+        selector: { number: { min: 0.01, max: 100000, step: 0.01, mode: box } },
+      }
+    unit: { example: g, selector: { text } }
+    name: { selector: { text } }
     calories: { selector: { number: { min: 0, max: 100000, mode: box } } }
     protein: { selector: { number: { min: 0, max: 100000, mode: box } } }
     carbohydrates: { selector: { number: { min: 0, max: 100000, mode: box } } }
@@ -34,18 +61,24 @@ log_food:
     fiber: { selector: { number: { min: 0, max: 100000, mode: box } } }
     sugar: { selector: { number: { min: 0, max: 100000, mode: box } } }
     sodium: { selector: { number: { min: 0, max: 100000, mode: box } } }
-    eaten_at: { selector: { datetime: } }
+    eaten_at: { selector: { datetime } }
 delete_entries:
   fields:
+    user_id: { selector: { text } }
     entry_ids: { required: true, selector: { text: { multiple: true } } }
 update_entry:
   fields:
-    entry_id: { required: true, selector: { text: } }
-    meal: { example: cena, selector: { text: } }
-    name: { selector: { text: } }
-    servings: { selector: { number: { min: 0.01, max: 100, step: 0.01, mode: box } } }
-    quantity: { selector: { number: { min: 0.01, max: 100000, step: 0.01, mode: box } } }
-    unit: { example: g, selector: { text: } }
+    user_id: { selector: { text } }
+    entry_id: { required: true, selector: { text } }
+    meal: { example: cena, selector: { text } }
+    name: { selector: { text } }
+    servings:
+      { selector: { number: { min: 0.01, max: 100, step: 0.01, mode: box } } }
+    quantity:
+      {
+        selector: { number: { min: 0.01, max: 100000, step: 0.01, mode: box } },
+      }
+    unit: { example: g, selector: { text } }
     calories: { selector: { number: { min: 0, max: 100000, mode: box } } }
     protein: { selector: { number: { min: 0, max: 100000, mode: box } } }
     carbohydrates: { selector: { number: { min: 0, max: 100000, mode: box } } }
@@ -53,28 +86,40 @@ update_entry:
     fiber: { selector: { number: { min: 0, max: 100000, mode: box } } }
     sugar: { selector: { number: { min: 0, max: 100000, mode: box } } }
     sodium: { selector: { number: { min: 0, max: 100000, mode: box } } }
-    eaten_at: { selector: { datetime: } }
+    eaten_at: { selector: { datetime } }
 copy_day:
   fields:
-    from: { required: true, selector: { date: } }
-    to: { selector: { date: } }
+    user_id: { selector: { text } }
+    from: { required: true, selector: { date } }
+    to: { selector: { date } }
     meals: { selector: { text: { multiple: true } } }
-    to_meal: { selector: { text: } }
+    to_meal: { selector: { text } }
 get_diary:
   fields:
-    start: { selector: { date: } }
-    end: { selector: { date: } }
+    user_id: { selector: { text } }
+    start: { selector: { date } }
+    end: { selector: { date } }
 save_food:
   fields:
+    user_id: { selector: { text } }
     kind: { selector: { select: { options: [food, recipe, meal] } } }
     ingredients: { selector: { object: {} } }
     instructions: { selector: { object: {} } }
-    recipe_servings: { selector: { number: { min: 0.001, max: 100000, mode: box } } }
-    name: { required: true, selector: { text: } }
-    brand: { selector: { text: } }
-    serving_amount: { default: 1, selector: { number: { min: 0.001, max: 100000, mode: box } } }
-    serving_unit: { default: serving, selector: { text: } }
-    calories: { required: true, selector: { number: { min: 0, max: 100000, mode: box } } }
+    recipe_servings:
+      { selector: { number: { min: 0.001, max: 100000, mode: box } } }
+    name: { required: true, selector: { text } }
+    brand: { selector: { text } }
+    serving_amount:
+      {
+        default: 1,
+        selector: { number: { min: 0.001, max: 100000, mode: box } },
+      }
+    serving_unit: { default: serving, selector: { text } }
+    calories:
+      {
+        required: true,
+        selector: { number: { min: 0, max: 100000, mode: box } },
+      }
     protein: { selector: { number: { min: 0, max: 100000, mode: box } } }
     carbohydrates: { selector: { number: { min: 0, max: 100000, mode: box } } }
     fat: { selector: { number: { min: 0, max: 100000, mode: box } } }
@@ -83,13 +128,42 @@ save_food:
     sodium: { selector: { number: { min: 0, max: 100000, mode: box } } }
 sync_myfitnesspal:
   fields:
-    since: { selector: { date: } }
+    user_id: { selector: { text } }
+    since: { selector: { date } }
 set_goals:
   fields:
-    calories: { selector: { number: { min: 0, max: 10000, unit_of_measurement: kcal, mode: box } } }
-    protein: { selector: { number: { min: 0, max: 1000, unit_of_measurement: g, mode: box } } }
-    carbohydrates: { selector: { number: { min: 0, max: 2000, unit_of_measurement: g, mode: box } } }
-    fat: { selector: { number: { min: 0, max: 1000, unit_of_measurement: g, mode: box } } }
+    user_id: { selector: { text } }
+    calories:
+      {
+        selector:
+          {
+            number:
+              { min: 0, max: 10000, unit_of_measurement: kcal, mode: box },
+          },
+      }
+    protein:
+      {
+        selector:
+          { number: { min: 0, max: 1000, unit_of_measurement: g, mode: box } },
+      }
+    carbohydrates:
+      {
+        selector:
+          { number: { min: 0, max: 2000, unit_of_measurement: g, mode: box } },
+      }
+    fat:
+      {
+        selector:
+          { number: { min: 0, max: 1000, unit_of_measurement: g, mode: box } },
+      }
     calorie_period: { selector: { select: { options: [week, day] } } }
-    recommend_since: { selector: { date: } }
+    recommend_since: { selector: { date } }
 get_goals:
+
+list_users:
+  fields:
+    search: { selector: { text } }
+    id: { selector: { text } }
+    offset:
+      { default: 0, selector: { number: { min: 0, max: 1000000, mode: box } } }
+    limit: { default: 20, selector: { number: { min: 1, max: 50, mode: box } } }

@@ -37,17 +37,29 @@ MEAL = vol.All(cv.string, vol.Length(min=1, max=30))
 
 
 class Tracker:
-    """Runtime state for the single config entry."""
+    """Runtime state for one calorie tracker user."""
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         self.hass = hass
         self.entry = entry
-        self.store: Store = Store(hass, STORAGE_VERSION, f"{DOMAIN}.data")
+        self.store: Store = Store(hass, STORAGE_VERSION, entry.data.get("storage_key", f"{DOMAIN}.data"))
         self.catalog = Catalog()
         self.lock = asyncio.Lock()
         self.sync_task: asyncio.Task | None = None
         self.status: dict[str, Any] = {"state": "idle"}
         self.selected_day: dt.date | None = None  # dashboard date; None follows today
+
+    @property
+    def identity(self) -> str:
+        return "tracker" if "storage_key" not in self.entry.data else self.entry.entry_id
+
+    @property
+    def notification_prefix(self) -> str:
+        return DOMAIN if self.identity == "tracker" else f"{DOMAIN}_{self.identity}"
+
+    def entity_id(self, key: str) -> str:
+        prefix = DOMAIN if self.identity == "tracker" else f"{DOMAIN}_{self.identity}"
+        return f"{prefix}_{key}"
 
     def shown_day(self) -> str:
         return (self.selected_day or dt_util.now().date()).isoformat()
@@ -130,8 +142,8 @@ class Tracker:
             domain, name = service.split(".", 1)
             try:
                 await self.hass.services.async_call(domain, name, {
-                    "title": "Calorie Tracker", "message": message,
-                    "data": {"tag": DOMAIN, "group": DOMAIN}}, blocking=True)
+                    "title": self.entry.title, "message": message,
+                    "data": {"tag": self.notification_prefix, "group": DOMAIN}}, blocking=True)
             except Exception as error:
                 _LOGGER.warning("Calorie Tracker notification failed: %s", error)
         elif state.get("pending") and not getattr(self, "_alert_timer", None):
@@ -228,7 +240,7 @@ class Tracker:
             "3. Close the private window **without logging out** (do not reuse this cookie in any browser).\n"
             "4. Settings → Devices & services → Calorie Tracker → **Re-authenticate**, paste it.",
             title="Calorie Tracker: reconnect MyFitnessPal",
-            notification_id=f"{DOMAIN}_reauth",
+            notification_id=f"{self.notification_prefix}_reauth",
         )
 
     @callback
@@ -252,10 +264,16 @@ class Tracker:
                 self.entry, data={**self.entry.data, CONF_SESSION_TOKEN: token})
 
 
-def _tracker(hass: HomeAssistant) -> Tracker:
+def _tracker(hass: HomeAssistant, user_id: str | None = None) -> Tracker:
     entries = hass.config_entries.async_loaded_entries(DOMAIN)
     if not entries:
         raise ServiceValidationError("Calorie Tracker is not set up")
+    if user_id:
+        entries = [entry for entry in entries if entry.entry_id == user_id]
+        if not entries:
+            raise ServiceValidationError("Calorie Tracker user not found")
+    elif len(hass.config_entries.async_entries(DOMAIN)) != 1:
+        raise ServiceValidationError("Select a Calorie Tracker user with user_id")
     return entries[0].runtime_data
 
 
@@ -271,19 +289,30 @@ def _fail(call: ServiceCall, error: Exception) -> ServiceResponse:
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
+    async def list_users(call: ServiceCall) -> ServiceResponse:
+        entries = hass.config_entries.async_loaded_entries(DOMAIN)
+        query = call.data.get("search", "").casefold()
+        items = sorted(
+            ({"id": entry.entry_id, "name": entry.title[:200]} for entry in entries
+             if query in entry.title.casefold()
+             and (not call.data.get("id") or entry.entry_id == call.data["id"])),
+            key=lambda item: (item["name"].casefold(), item["id"]))
+        offset, limit = call.data["offset"], call.data["limit"]
+        return {"items": items[offset:offset + limit], "total": len(items)}
+
     async def search(call: ServiceCall) -> ServiceResponse:
-        t = _tracker(hass)
+        t = _tracker(hass, call.data.get("user_id"))
         return t.catalog.search(call.data.get("query", ""), call.data.get("kind"),
                                 call.data["offset"], call.data["limit"])
 
     async def get_food(call: ServiceCall) -> ServiceResponse:
         try:
-            return _tracker(hass).catalog.food(call.data["food_id"])
+            return _tracker(hass, call.data.get("user_id")).catalog.food(call.data["food_id"])
         except KeyError as error:
             return _fail(call, error)
 
     async def recommend(call: ServiceCall) -> ServiceResponse:
-        t = _tracker(hass)
+        t = _tracker(hass, call.data.get("user_id"))
         targets = {k: call.data[k] for k in GOAL_KEYS if k in call.data}
         kind, query, limit = call.data.get("kind"), call.data.get("query", ""), call.data["limit"]
         # Only foods eaten since this date (e.g. available where the user lives now); "" disables.
@@ -317,7 +346,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             return _fail(call, error)
 
     async def set_goals(call: ServiceCall) -> ServiceResponse:
-        t = _tracker(hass)
+        t = _tracker(hass, call.data.get("user_id"))
         async with t.lock:
             goals = dict(t.catalog.sync.get("goals", {}))
             for key in GOAL_KEYS:
@@ -334,10 +363,10 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         return t.goal_status()
 
     async def get_goals(call: ServiceCall) -> ServiceResponse:
-        return _tracker(hass).goal_status()
+        return _tracker(hass, call.data.get("user_id")).goal_status()
 
     async def log_food(call: ServiceCall) -> ServiceResponse:
-        t = _tracker(hass)
+        t = _tracker(hass, call.data.get("user_id"))
         eaten = dt_util.as_local(call.data.get("eaten_at") or dt_util.now())
         values = {k: call.data[k] for k in ("calories", "protein", "carbohydrates", "fat", "fiber", "sugar", "sodium")
                   if k in call.data}
@@ -356,7 +385,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
                 **({"goals": t.goal_status(entry["day"])["progress"]} if t.goals else {})}
 
     async def delete_entries(call: ServiceCall) -> ServiceResponse:
-        t = _tracker(hass)
+        t = _tracker(hass, call.data.get("user_id"))
         async with t.lock:
             try:
                 deleted = t.catalog.delete(call.data["entry_ids"])
@@ -366,7 +395,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         return {"deleted": deleted}
 
     async def update_entry(call: ServiceCall) -> ServiceResponse:
-        t = _tracker(hass)
+        t = _tracker(hass, call.data.get("user_id"))
         values = {k: call.data[k] for k in ("calories", "protein", "carbohydrates", "fat", "fiber", "sugar", "sodium")
                   if k in call.data}
         eaten = call.data.get("eaten_at")
@@ -385,7 +414,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         return {"entry": entry, "day_totals": days}
 
     async def copy_day(call: ServiceCall) -> ServiceResponse:
-        t = _tracker(hass)
+        t = _tracker(hass, call.data.get("user_id"))
         target = call.data.get("to") or t.today()
         async with t.lock:
             try:
@@ -397,7 +426,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
              "calories": e["nutrients"]["calories"]} for e in copies], "day_totals": t.catalog.day(target)["totals"]}
 
     async def get_diary(call: ServiceCall) -> ServiceResponse:
-        t = _tracker(hass)
+        t = _tracker(hass, call.data.get("user_id"))
         start = call.data.get("start") or t.today()
         end = call.data.get("end")
         if not end or end == start:
@@ -410,7 +439,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         return t.catalog.range(start, end)
 
     async def save_food(call: ServiceCall) -> ServiceResponse:
-        t = _tracker(hass)
+        t = _tracker(hass, call.data.get("user_id"))
         values = {k: call.data[k] for k in ("calories", "protein", "carbohydrates", "fat", "fiber", "sugar", "sodium")
                   if k in call.data}
         async with t.lock:
@@ -424,7 +453,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         return {"food": t.catalog.brief(food)}
 
     async def sync(call: ServiceCall) -> ServiceResponse:
-        t = _tracker(hass)
+        t = _tracker(hass, call.data.get("user_id"))
         since = dt.date.fromisoformat(call.data["since"]) if call.data.get("since") else None
         task = t.start_sync(since)
         if not call.return_response:
@@ -434,7 +463,18 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     targets = {vol.Optional(k): NUMBER for k in ("calories", "protein", "carbohydrates", "fat")}
     nutrients = {**targets, **{vol.Optional(k): NUMBER for k in ("fiber", "sugar", "sodium")}}
     kind = {vol.Optional("kind"): vol.In(KINDS)}
-    register = hass.services.async_register
+    def register(domain, name, handler, schema, **kwargs):
+        # Every food/diary service is scoped; omission is safe only for one configured user.
+        if name != "list_users":
+            schema = schema.extend({vol.Optional("user_id"): vol.All(cv.string, vol.Length(min=1, max=100))})
+        hass.services.async_register(domain, name, handler, schema, **kwargs)
+
+    register(DOMAIN, "list_users", list_users, vol.Schema({
+        vol.Optional("search", default=""): vol.All(cv.string, vol.Length(max=200)),
+        vol.Optional("id"): vol.All(cv.string, vol.Length(min=1, max=100)),
+        vol.Optional("offset", default=0): vol.All(int, vol.Range(min=0, max=1000000)),
+        vol.Optional("limit", default=20): vol.All(int, vol.Range(min=1, max=50)),
+    }), supports_response=SupportsResponse.ONLY)
     register(DOMAIN, "search_foods", search, vol.Schema({
         vol.Optional("query", default=""): cv.string, **kind,
         vol.Optional("offset", default=0): vol.All(int, vol.Range(min=0)),
@@ -518,7 +558,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await tracker.keepalive()
 
     entry.async_on_unload(async_track_time_interval(hass, keepalive, timedelta(hours=6)))
-    persistent_notification.async_dismiss(hass, f"{DOMAIN}_reauth")
+    persistent_notification.async_dismiss(hass, f"{tracker.notification_prefix}_reauth")
     return True
 
 

@@ -33,10 +33,10 @@ class Button(ButtonEntity):
     _attr_has_entity_name = True
 
     def __init__(self, tracker, key, name, icon, action) -> None:
-        self._attr_unique_id = f"{DOMAIN}_{key}"
+        self._attr_unique_id = tracker.entity_id(key)
         self._attr_name = name
         self._attr_icon = icon
-        self._attr_device_info = device_info()
+        self._attr_device_info = device_info(tracker)
         self._action = action
 
     async def async_press(self) -> None:

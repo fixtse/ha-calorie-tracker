@@ -25,7 +25,8 @@ class DiaryDate(DateEntity):
 
     def __init__(self, tracker) -> None:
         self.tracker = tracker
-        self._attr_device_info = device_info()
+        self._attr_unique_id = tracker.entity_id("diary_date")
+        self._attr_device_info = device_info(tracker)
 
     @property
     def native_value(self) -> date:

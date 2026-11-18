@@ -13,7 +13,7 @@ Zero reads and writes it through its services. The data lives in
 Use the button to add the repository in HACS, install **Calorie Tracker**, then restart Home Assistant.
 
 **HACS:** HACS → ⋮ → Custom repositories → add `https://github.com/fixtse/ha-calorie-tracker`
-(type *Integration*), install **Calorie Tracker**, then restart Home Assistant.
+(type _Integration_), install **Calorie Tracker**, then restart Home Assistant.
 
 **Manual:** copy `custom_components/calorie_tracker` into `/config/custom_components/` and restart.
 
@@ -25,6 +25,27 @@ Or go to **Settings → Devices & services → Add integration → Calorie Track
 
 Works on its own, or with [Zero](https://github.com/fixtse/ha-zero-assistant), whose food tools
 call this integration's services.
+
+## Multiple users
+
+Add Calorie Tracker once per person in **Settings → Devices & services → Add integration**.
+Give each entry a user name and, optionally, that person's own MyFitnessPal cookie.
+Each user has separate foods, recipes, diary, goals, sync settings, alerts and entities.
+The original installation keeps its data and existing entity IDs; additional users start empty.
+The included dashboard still targets the original user's entities; additional users have their own entities for dashboards.
+
+In Zero, save the profile's Home Assistant connection, then open its **Home Assistant** tab
+and select **Calorie Tracker user** from the searchable dropdown. Save the profile to apply it.
+The selector appears when the connected server supports the tracker user catalog (0.7.0+).
+The saved selection scopes every food operation and stays tied to that Home Assistant server.
+Profiles without a selection have no food tools, except the existing owner compatibility path
+which works only while HA has a single configured tracker user. Selecting **No user assigned**
+explicitly disables this path for the profile.
+
+Services accept `user_id`, the Calorie Tracker config entry ID returned by `list_users`.
+`list_users` supports `search`, exact `id`, `offset` and `limit` (maximum 50).
+Omit `user_id` only when one tracker user is configured; multiple users require an explicit ID.
+Unknown users fail instead of falling back to another diary.
 
 ## MyFitnessPal cookie (the "token")
 
@@ -119,19 +140,19 @@ the next one.
 All of these return data (`return_response`). Correctable errors come back as
 `{"error": "..."}` when a response is requested.
 
-| Service | Purpose |
-|---|---|
-| `search_foods` | Search by name/brand, most used first |
-| `get_food` | All nutrients, serving sizes and ingredients |
-| `recommend_foods` | No targets: options within this `meal`'s share of remaining goals. Targets (any of `calories`, `protein`, `carbohydrates`, `fat`): closest portions within remaining goals |
-| `log_food` | Log `food_id` with `servings` or `quantity` + `unit`, or `name` + nutrients. `meal` accepts breakfast/desayuno, lunch/almuerzo, dinner/cena, snack |
-| `get_diary` | A day's entries and totals, or a range with daily averages |
-| `save_food` | Add or update a custom food |
-| `update_entry` | Change an entry's meal, time, name, portion or nutrients (edited MyFitnessPal entries survive re-syncs) |
-| `copy_day` | Copy a day (or some of its meals) to another day, today by default |
-| `delete_entries` | Remove diary entries |
-| `set_goals` / `get_goals` | Daily goals (0 removes one), weekly calorie budget, `recommend_since` date, today's progress |
-| `sync_myfitnesspal` | Import from MyFitnessPal |
+| Service                   | Purpose                                                                                                                                                                    |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `search_foods`            | Search by name/brand, most used first                                                                                                                                      |
+| `get_food`                | All nutrients, serving sizes and ingredients                                                                                                                               |
+| `recommend_foods`         | No targets: options within this `meal`'s share of remaining goals. Targets (any of `calories`, `protein`, `carbohydrates`, `fat`): closest portions within remaining goals |
+| `log_food`                | Log `food_id` with `servings` or `quantity` + `unit`, or `name` + nutrients. `meal` accepts breakfast/desayuno, lunch/almuerzo, dinner/cena, snack                         |
+| `get_diary`               | A day's entries and totals, or a range with daily averages                                                                                                                 |
+| `save_food`               | Add or update a custom food                                                                                                                                                |
+| `update_entry`            | Change an entry's meal, time, name, portion or nutrients (edited MyFitnessPal entries survive re-syncs)                                                                    |
+| `copy_day`                | Copy a day (or some of its meals) to another day, today by default                                                                                                         |
+| `delete_entries`          | Remove diary entries                                                                                                                                                       |
+| `set_goals` / `get_goals` | Daily goals (0 removes one), weekly calorie budget, `recommend_since` date, today's progress                                                                               |
+| `sync_myfitnesspal`       | Import from MyFitnessPal                                                                                                                                                   |
 
 MyFitnessPal has no public API. The integration uses the website's own endpoints, which can
 change without notice. It only reads from MyFitnessPal; it never writes there.
@@ -141,3 +162,5 @@ Tests: `python3 -B -m unittest discover -s tests` (no Home Assistant needed).
 ## Saving recipes through Zero
 
 Ask Zero to create and save a recipe. Its `food_save` tool calls `save_food` with `kind: recipe`, `ingredients` (quantity-bearing strings), `instructions` (ordered steps), and `recipe_servings` (batch yield). Calories and other nutrients are **per listed serving**, not batch totals; estimates should be identified as such. Same name, brand, kind and serving unit updates the saved recipe. Recipes persist in the existing HA storage, independently of MyFitnessPal. Find them with `search_foods` (`kind: recipe`), retrieve full preparation details with `get_food`, and reuse them with `log_food` or `recommend_foods`. Saving does not log a diary entry.
+
+Real Home Assistant smoke check (isolated temporary config): install `tests/ha_runtime/requirements.txt` in a venv, then run `python tests/ha_runtime/verify.py`.

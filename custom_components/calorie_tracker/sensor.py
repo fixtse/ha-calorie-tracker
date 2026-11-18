@@ -22,8 +22,8 @@ TOTALS = (
 )
 
 
-def device_info() -> DeviceInfo:
-    return DeviceInfo(identifiers={(DOMAIN, "tracker")}, name="Calorie Tracker", entry_type=DeviceEntryType.SERVICE)
+def device_info(tracker) -> DeviceInfo:
+    return DeviceInfo(identifiers={(DOMAIN, tracker.identity)}, name=tracker.entry.title, entry_type=DeviceEntryType.SERVICE)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, add: AddEntitiesCallback) -> None:
@@ -41,9 +41,9 @@ class Base(SensorEntity):
 
     def __init__(self, tracker, key: str, name: str) -> None:
         self.tracker = tracker
-        self._attr_unique_id = f"{DOMAIN}_{key}"
+        self._attr_unique_id = tracker.entity_id(key)
         self._attr_name = name
-        self._attr_device_info = device_info()
+        self._attr_device_info = device_info(tracker)
 
     async def async_added_to_hass(self) -> None:
         self.async_on_remove(async_dispatcher_connect(self.hass, SIGNAL_UPDATED, self._refresh))

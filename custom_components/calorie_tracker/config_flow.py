@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from typing import Any
+from uuid import uuid4
 
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlowWithReload
@@ -47,9 +48,12 @@ class CalorieTrackerConfigFlow(ConfigFlow, domain=DOMAIN):
             if error:
                 errors["base"] = error
             else:
-                return self.async_create_entry(title="Calorie Tracker", data={CONF_SESSION_TOKEN: token})
+                return self.async_create_entry(title=user_input["name"].strip(),
+                                              data={CONF_SESSION_TOKEN: token, "storage_key": f"{DOMAIN}.{uuid4().hex}"})
         return self.async_show_form(
-            step_id="user", data_schema=vol.Schema({vol.Optional(CONF_SESSION_TOKEN): TOKEN}), errors=errors)
+            step_id="user", data_schema=vol.Schema({
+                vol.Required("name"): vol.All(str, str.strip, vol.Length(min=1, max=100)),
+                vol.Optional(CONF_SESSION_TOKEN): TOKEN}), errors=errors)
 
     async def async_step_reauth(self, entry_data: Mapping[str, Any]) -> ConfigFlowResult:
         return await self.async_step_reauth_confirm()
