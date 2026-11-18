@@ -82,10 +82,11 @@ def calculate(settings, state, entries, today: str):
     summary["initial_tdee"] = initial_tdee
     weeks, days, estimates = [], [], []
     last_weight, previous_average, previous_has_weights = initial_weight, initial_weight, True
+    previous_observed_average = initial_weight
     for index in range((current - beginning).days // 7 + 1):
         week_start = beginning + timedelta(days=index * 7)
         complete = week_start + timedelta(days=7) <= current
-        week_weights, week_intake, observed_weights = [], [], 0
+        week_weights, week_intake, observed_weights = [], [], []
         for offset in range(7):
             day = week_start + timedelta(days=offset)
             if day > current:
@@ -94,11 +95,13 @@ def calculate(settings, state, entries, today: str):
             measured = numeric(weights.get(key, {}).get("kg"))
             if measured is not None:
                 last_weight = measured
-                observed_weights += 1
+                observed_weights.append(measured)
             week_weights.append(last_weight)
             if key in intake:
                 week_intake.append(intake[key])
             days.append({"day": key, "weight_kg": measured, "calories": intake.get(key)})
+        observed_average = mean(observed_weights) if observed_weights else None
+        observed_delta = observed_average - previous_observed_average if observed_average is not None else None
         avg_weight = mean(week_weights) if observed_weights else None
         delta = avg_weight - previous_average if avg_weight is not None and previous_has_weights else None
         eligible = complete and len(week_intake) >= 4 and delta is not None
@@ -111,12 +114,15 @@ def calculate(settings, state, entries, today: str):
             estimates.append(weekly_tdee)
         smoothed = mean(estimates) if estimates else weekly_tdee if index == 0 and weekly_tdee is not None else initial_tdee
         weeks.append({"week": index + 1, "start": week_start.isoformat(), "complete": complete,
-                      "weight_days": observed_weights, "calorie_days": len(week_intake),
-                      "average_weight_kg": avg_weight,
+                      "weight_days": len(observed_weights), "calorie_days": len(week_intake),
+                      "average_weight_kg": observed_average,
+                      "tdee_average_weight_kg": avg_weight, "tdee_weight_change_kg": delta,
                       "average_calories": mean(week_intake) if week_intake else None,
-                      "weight_change_kg": delta, "weekly_tdee": weekly_tdee,
+                      "weight_change_kg": observed_delta, "weekly_tdee": weekly_tdee,
                       "smoothed_tdee": smoothed, "eligible": weekly_tdee is not None})
         if complete:
+            if observed_average is not None:
+                previous_observed_average = observed_average
             previous_has_weights = avg_weight is not None
             if avg_weight is not None:
                 previous_average = avg_weight

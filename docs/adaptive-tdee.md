@@ -108,3 +108,5 @@ include phase, initial estimate, baseline inputs, ranges and calibration coverag
 attributes contain at most 90 daily records and 53 weekly records, excluded from recorder
 attributes. For older data, `calorie_tracker.get_tdee` supports `kind: days|weeks`, `offset`
 and `limit` (1–53); results are newest first. All services accept the selected tracker user ID.
+
+The weekly table averages only recorded weights and compares with the preceding recorded weekly average (CALCULATIONS L/R). The expenditure calculation separately carries weights forward over missing days (AV/AW); history exposes these helper values as `tdee_average_weight_kg` and `tdee_weight_change_kg`.

@@ -59,6 +59,21 @@ class TDEETest(unittest.TestCase):
         self.assertAlmostEqual(tdee.calculate(settings, state, entries, "2026-01-22")["summary"]["tdee"],
                                result["summary"]["tdee"])
 
+    def test_display_weight_change_uses_recorded_weights_not_filled_helpers(self):
+        settings, state, entries = self.history()
+        for offset, kg in enumerate((79.9, 79.7, 79.5, 79.7, 79.8)):
+            state["weights"][f"2026-01-{8 + offset:02d}"] = {"kg": kg}
+        del state["weights"]["2026-01-13"]
+        del state["weights"]["2026-01-14"]
+        week = tdee.calculate(settings, state, entries, "2026-01-15")["weeks"][1]
+        self.assertEqual(week["weight_days"], 5)
+        self.assertAlmostEqual(week["average_weight_kg"], 79.72)
+        self.assertAlmostEqual(week["weight_change_kg"], -.28)
+        filled = (79.9 + 79.7 + 79.5 + 79.7 + 79.8 * 3) / 7
+        self.assertAlmostEqual(week["tdee_average_weight_kg"], filled)
+        self.assertAlmostEqual(week["tdee_weight_change_kg"], filled - 80)
+        self.assertAlmostEqual(week["weekly_tdee"], 2200 - (filled - 80) * tdee.KCAL_PER_KG / 7)
+
     def test_missing_diary_day_and_missing_weight_week_are_not_zero(self):
         settings, state, entries = self.history()
         entries.pop(8)
