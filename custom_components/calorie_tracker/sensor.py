@@ -32,6 +32,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, add: AddEnt
     entities += [RemainingSensor(tracker, nutrient, name.replace(" today", ""), unit, "mdi:target")
                  for _, name, nutrient, unit, _ in TOTALS]
     entities += [SyncSensor(tracker), SelectedDaySensor(tracker), HistorySensor(tracker), RecipesSensor(tracker)]
+    entities += [TDEESensor(tracker), TDEEHistorySensor(tracker), WeightSensor(tracker)]
+    entities += [AdaptiveTargetSensor(tracker, key) for key in ("calories", "protein", "carbohydrates", "fat")]
     add(entities)
 
 
@@ -213,3 +215,68 @@ class RecipesSensor(Base):
              "protein": round(f["nutrients"]["protein"] or 0), "carbohydrates": round(f["nutrients"]["carbohydrates"] or 0),
              "fat": round(f["nutrients"]["fat"] or 0), "ingredients": "; ".join(f.get("ingredients", []))[:600]}
             for f in self._items()]}
+
+
+class TDEESensor(Base):
+    _attr_native_unit_of_measurement = "kcal"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_icon = "mdi:fire"
+    _attr_suggested_display_precision = 0
+
+    def __init__(self, tracker):
+        super().__init__(tracker, "estimated_tdee", "Estimated TDEE")
+
+    @property
+    def native_value(self):
+        return self.tracker.adaptive.result()["summary"]["tdee"]
+
+    @property
+    def extra_state_attributes(self):
+        return self.tracker.adaptive.result()["summary"]
+
+
+class AdaptiveTargetSensor(Base):
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 0
+
+    def __init__(self, tracker, nutrient):
+        super().__init__(tracker, "adaptive_" + nutrient + "_target", "Adaptive " + nutrient + " target")
+        self.nutrient = nutrient
+        self._attr_native_unit_of_measurement = "kcal" if nutrient == "calories" else "g"
+        self._attr_icon = "mdi:target"
+
+    @property
+    def native_value(self):
+        targets = self.tracker.adaptive.result()["summary"]["targets"]
+        return targets.get(self.nutrient) if targets else None
+
+
+class WeightSensor(Base):
+    _attr_native_unit_of_measurement = "kg"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 2
+    _attr_icon = "mdi:scale-bathroom"
+
+    def __init__(self, tracker):
+        super().__init__(tracker, "tracked_weight", "Tracked weight")
+
+    @property
+    def native_value(self):
+        return self.tracker.adaptive.result()["summary"].get("latest_weight_kg")
+
+
+class TDEEHistorySensor(Base):
+    _attr_icon = "mdi:table"
+    _unrecorded_attributes = frozenset({"days", "weeks"})
+
+    def __init__(self, tracker):
+        super().__init__(tracker, "tdee_history", "TDEE history")
+
+    @property
+    def native_value(self):
+        return self.tracker.adaptive.result()["summary"]["status"]
+
+    @property
+    def extra_state_attributes(self):
+        result = self.tracker.adaptive.result()
+        return {"days": result["days"][-90:], "weeks": result["weeks"][-53:]}

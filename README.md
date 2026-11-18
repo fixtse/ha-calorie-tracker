@@ -47,6 +47,10 @@ Services accept `user_id`, the Calorie Tracker config entry ID returned by `list
 Omit `user_id` only when one tracker user is configured; multiple users require an explicit ID.
 Unknown users fail instead of falling back to another diary.
 
+## Optional adaptive TDEE and scale tracking
+
+Connect a personal scale or select a **BodyMiScale user**, capture daily weights and use diary calories to adapt TDEE. Each user can change a kg/week weight-change goal at any time and separately opt in to automatic calorie/macro targets. [Setup, formula mapping and Calculations-style dashboard](docs/adaptive-tdee.md). Disabled by default; existing data and manual goals are preserved.
+
 ## MyFitnessPal cookie (the "token")
 
 MyFitnessPal's login requires a reCAPTCHA, so the integration cannot log in with a password.

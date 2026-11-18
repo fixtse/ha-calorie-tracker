@@ -37,7 +37,7 @@
   },
   "options": {
     "step": {
-      "init": {
+      "general": {
         "title": "Calorie Tracker options",
         "data": {
           "notify_service": "Notify service for goal alerts (empty = off)",
@@ -45,7 +45,34 @@
           "sync_time": "Daily MyFitnessPal sync time",
           "history_start": "Import MyFitnessPal diary history from"
         }
+      },
+      "init": {
+        "title": "Calorie Tracker options",
+        "menu_options": {
+          "general": "Sync and alerts",
+          "tdee": "Adaptive TDEE and scale"
+        }
+      },
+      "tdee": {
+        "title": "Adaptive TDEE and scale",
+        "description": "Optional Calculations-sheet model. Select your own BodyMiScale user, or a personal weight sensor. BodyMiScale handles identification on shared scales. Starting weight/body fat stay fixed; change the weekly goal any time. Missing calorie days do not calibrate TDEE. Automatic targets are a separate opt-in.",
+        "data": {
+          "tdee_enabled": "Enable adaptive TDEE tracking",
+          "tdee_auto_goals": "Automatically use calculated calorie and macro goals",
+          "tdee_bodymiscale_entry": "BodyMiScale user (optional)",
+          "tdee_weight_entity": "Weight sensor (when not using BodyMiScale)",
+          "tdee_body_fat_entity": "Body-fat percentage sensor (optional)",
+          "tdee_measurement_entity": "Last-measurement timestamp sensor (optional)",
+          "tdee_initial_weight": "Starting weight in kg (optional; otherwise captured from scale)",
+          "tdee_initial_body_fat": "Starting body fat in % (optional with a body-fat sensor)",
+          "tdee_start_date": "Starting date (optional; otherwise first accepted measurement)",
+          "tdee_weekly_goal": "Weekly weight change in kg (negative = lose, positive = gain)"
+        }
       }
+    },
+    "error": {
+      "missing_weight_source": "Choose a BodyMiScale user or a weight sensor before enabling tracking.",
+      "missing_bodymiscale_user": "This BodyMiScale user has no enabled weight sensor. Enable its weight and last-measurement sensors first."
     }
   },
   "services": {
@@ -472,6 +499,42 @@
         },
         "limit": {
           "name": "Limit"
+        }
+      }
+    },
+    "get_tdee": {
+      "name": "Get adaptive TDEE",
+      "description": "Read this user’s estimate and bounded daily or weekly history. No workbook is imported.",
+      "fields": {
+        "user_id": {
+          "name": "User"
+        },
+        "kind": {
+          "name": "days or weeks"
+        },
+        "offset": {
+          "name": "Offset"
+        },
+        "limit": {
+          "name": "Limit (1–53)"
+        }
+      }
+    },
+    "record_weight": {
+      "name": "Record weight",
+      "description": "Correct or record one user’s dated weight in kg. Newer same-day measurements replace older ones. Does not enable automatic goals.",
+      "fields": {
+        "user_id": {
+          "name": "User"
+        },
+        "weight_kg": {
+          "name": "Weight (kg)"
+        },
+        "body_fat": {
+          "name": "Body fat (%)"
+        },
+        "measured_at": {
+          "name": "Measurement time (with timezone)"
         }
       }
     }

@@ -26,11 +26,12 @@ from .const import (
     SIGNAL_UPDATED, STORAGE_VERSION,
 )
 from .goals import ALERT_INTERVAL, GOAL_KEYS, check_alerts, clean_goals, meal_targets, progress, week_budget
+from .adaptive import AdaptiveTDEE
 from .core import KINDS, Catalog, meal_key
 from .mfp import AuthError, MyFitnessPal, sync_catalog
 
 _LOGGER = logging.getLogger(__name__)
-PLATFORMS = [Platform.SENSOR, Platform.BUTTON, Platform.DATE]
+PLATFORMS = [Platform.SENSOR, Platform.BUTTON, Platform.DATE, Platform.NUMBER, Platform.SWITCH]
 NUMBER = vol.All(vol.Coerce(float), vol.Range(min=0, max=100000))
 DAY = cv.matches_regex(r"^\d{4}-\d{2}-\d{2}$")
 MEAL = vol.All(cv.string, vol.Length(min=1, max=30))
@@ -47,6 +48,7 @@ class Tracker:
         self.lock = asyncio.Lock()
         self.sync_task: asyncio.Task | None = None
         self.status: dict[str, Any] = {"state": "idle"}
+        self.adaptive = AdaptiveTDEE(self)
         self.selected_day: dt.date | None = None  # dashboard date; None follows today
 
     @property
@@ -81,6 +83,7 @@ class Tracker:
             self.status = {**self.status, "state": "idle"}
 
     async def save(self) -> None:
+        self.adaptive.invalidate()
         self.catalog.sync["status"] = self.status
         await self.store.async_save(self.catalog.dump())
         async_dispatcher_send(self.hass, SIGNAL_UPDATED)
@@ -88,6 +91,9 @@ class Tracker:
     # ---- goals and alerts ----------------------------------------------------------------
     @property
     def goals(self) -> dict[str, float]:
+        adaptive = self.adaptive.result()["summary"]
+        if adaptive["enabled"] and adaptive["auto_goals"] and adaptive["targets"]:
+            return clean_goals(adaptive["targets"])
         return clean_goals(self.catalog.sync.get("goals"))
 
     @property
@@ -116,6 +122,7 @@ class Tracker:
         day = day or self.today()
         status = {"goals": self.goals, "calorie_period": self.calorie_period,
                   "recommend_since": self.catalog.sync.get("recommend_since"),
+                  "adaptive_tdee": self.adaptive.result()["summary"],
                   "progress": progress(self.effective_goals(day), self.catalog.day(day)["totals"])}
         if week := self.week(day):
             status["week"] = week
@@ -289,6 +296,22 @@ def _fail(call: ServiceCall, error: Exception) -> ServiceResponse:
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
+    async def get_tdee(call: ServiceCall) -> ServiceResponse:
+        t = _tracker(hass, call.data.get("user_id"))
+        result = t.adaptive.result()
+        items = list(reversed(result[call.data["kind"]]))
+        offset, limit = call.data["offset"], call.data["limit"]
+        return {"summary": result["summary"], "items": items[offset:offset + limit], "total": len(items)}
+
+    async def record_weight(call: ServiceCall) -> ServiceResponse:
+        t = _tracker(hass, call.data.get("user_id"))
+        try:
+            await t.adaptive.record(call.data["weight_kg"], call.data.get("measured_at") or dt_util.now(),
+                                    call.data.get("body_fat"))
+        except ValueError as error:
+            return _fail(call, error)
+        return t.adaptive.result()["summary"]
+
     async def list_users(call: ServiceCall) -> ServiceResponse:
         entries = hass.config_entries.async_loaded_entries(DOMAIN)
         query = call.data.get("search", "").casefold()
@@ -348,6 +371,9 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     async def set_goals(call: ServiceCall) -> ServiceResponse:
         t = _tracker(hass, call.data.get("user_id"))
         async with t.lock:
+            # An explicit manual macro edit takes precedence over automatic targets.
+            if any(key in call.data for key in GOAL_KEYS):
+                t.adaptive.state.setdefault("controls", {})["tdee_auto_goals"] = False
             goals = dict(t.catalog.sync.get("goals", {}))
             for key in GOAL_KEYS:
                 if key in call.data:
@@ -469,6 +495,16 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             schema = schema.extend({vol.Optional("user_id"): vol.All(cv.string, vol.Length(min=1, max=100))})
         hass.services.async_register(domain, name, handler, schema, **kwargs)
 
+    register(DOMAIN, "get_tdee", get_tdee, vol.Schema({
+        vol.Optional("kind", default="weeks"): vol.In(["weeks", "days"]),
+        vol.Optional("offset", default=0): vol.All(int, vol.Range(min=0, max=1000000)),
+        vol.Optional("limit", default=12): vol.All(int, vol.Range(min=1, max=53)),
+    }), supports_response=SupportsResponse.ONLY)
+    register(DOMAIN, "record_weight", record_weight, vol.Schema({
+        vol.Required("weight_kg"): vol.All(vol.Coerce(float), vol.Range(min=.1, max=1000)),
+        vol.Optional("body_fat"): vol.All(vol.Coerce(float), vol.Range(min=.1, max=99.9)),
+        vol.Optional("measured_at"): cv.datetime,
+    }), supports_response=SupportsResponse.OPTIONAL)
     register(DOMAIN, "list_users", list_users, vol.Schema({
         vol.Optional("search", default=""): vol.All(cv.string, vol.Length(max=200)),
         vol.Optional("id"): vol.All(cv.string, vol.Length(min=1, max=100)),
@@ -538,6 +574,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     tracker = Tracker(hass, entry)
     await tracker.load()
     entry.runtime_data = tracker
+    await tracker.adaptive.setup()
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     hour, minute = (int(x) for x in entry.options.get(CONF_SYNC_TIME, DEFAULT_SYNC_TIME).split(":"))

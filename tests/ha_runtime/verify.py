@@ -93,6 +93,8 @@ async def main():
             await restored_legacy.load()
             assert restored_legacy.catalog.search("Legacy", None, 0, 10)["total"] == 1
             assert (await call("search_foods", user_id=alice.entry_id, query="Legacy"))["total"] == 0
+            from tdee_checks import verify_tdee
+            await verify_tdee(hass, alice, bob, module)
             # Legacy single-user calls still work with exactly one configured user.
             assert await hass.config_entries.async_unload(bob.entry_id)
             try:

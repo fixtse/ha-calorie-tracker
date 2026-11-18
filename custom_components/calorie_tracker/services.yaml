@@ -167,3 +167,31 @@ list_users:
     offset:
       { default: 0, selector: { number: { min: 0, max: 1000000, mode: box } } }
     limit: { default: 20, selector: { number: { min: 1, max: 50, mode: box } } }
+
+get_tdee:
+  fields:
+    user_id: { selector: { text: {} } }
+    kind: { default: weeks, selector: { select: { options: [days, weeks] } } }
+    offset:
+      { default: 0, selector: { number: { min: 0, max: 1000000, mode: box } } }
+    limit: { default: 12, selector: { number: { min: 1, max: 53, mode: box } } }
+record_weight:
+  fields:
+    user_id: { selector: { text: {} } }
+    weight_kg:
+      {
+        required: true,
+        selector:
+          {
+            number: { min: 0.1, max: 1000, mode: box, unit_of_measurement: kg },
+          },
+      }
+    body_fat:
+      {
+        selector:
+          {
+            number:
+              { min: 0.1, max: 99.9, mode: box, unit_of_measurement: "%" },
+          },
+      }
+    measured_at: { selector: { text: {} } }

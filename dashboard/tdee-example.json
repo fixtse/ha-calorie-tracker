@@ -1,0 +1,83 @@
+{
+  "title": "Nutrition calculations",
+  "views": [
+    {
+      "title": "Calculations",
+      "path": "calculations",
+      "icon": "mdi:calculator",
+      "cards": [
+        {
+          "type": "entities",
+          "title": "Tracking and weight-change goal",
+          "show_header_toggle": false,
+          "entities": [
+            "switch.calorie_tracker_adaptive_tdee",
+            "switch.calorie_tracker_automatic_nutrition_goals",
+            "number.calorie_tracker_weekly_weight_change_goal"
+          ]
+        },
+        {
+          "type": "entities",
+          "title": "TDEE and daily requirements",
+          "entities": [
+            "sensor.calorie_tracker_estimated_tdee",
+            "sensor.calorie_tracker_tracked_weight",
+            "sensor.calorie_tracker_adaptive_calories_target",
+            "sensor.calorie_tracker_adaptive_protein_target",
+            "sensor.calorie_tracker_adaptive_fat_target",
+            "sensor.calorie_tracker_adaptive_carbohydrates_target"
+          ]
+        },
+        {
+          "type": "markdown",
+          "content": "{% set phase = state_attr('sensor.calorie_tracker_estimated_tdee', 'status') %}\n{% set labels = {'disabled': 'Tracking disabled', 'waiting_for_body_stats': 'Waiting for starting weight and body fat', 'waiting_for_start_date': 'Waiting for the starting date', 'initial_estimate': 'Initial estimate (calibration in progress)', 'adaptive': 'Based on completed weight and intake weeks', 'invalid_targets': 'Adjust the weekly goal: no valid calorie or macro targets'} %}\n**Phase:** {{ labels.get(phase, 'Measurements not available') }}\n\n**Calibrated weeks:** {{ state_attr('sensor.calorie_tracker_estimated_tdee', 'calibration_weeks') or 0 }}\n\nPositive weekly change means gain; negative means loss. Keep starting body stats fixed. Complete diary days are needed for calibration.\n\n{% set ranges = state_attr('sensor.calorie_tracker_estimated_tdee', 'ranges') %}\n{% if ranges %}**Macro ranges (g):** Protein {{ ranges.protein[0] | round }}\u2013{{ ranges.protein[1] | round }}, fat {{ ranges.fat[0] | round }}\u2013{{ ranges.fat[1] | round }}, carbs {{ ranges.carbohydrates[0] | round }}\u2013{{ ranges.carbohydrates[1] | round }}.{% endif %}"
+        },
+        {
+          "type": "custom:apexcharts-card",
+          "header": {
+            "show": true,
+            "title": "Daily weight and calorie intake"
+          },
+          "graph_span": "90d",
+          "span": {
+            "end": "day"
+          },
+          "yaxis": [
+            {
+              "id": "kg",
+              "decimals": 1
+            },
+            {
+              "id": "kcal",
+              "opposite": true,
+              "decimals": 0
+            }
+          ],
+          "series": [
+            {
+              "entity": "sensor.calorie_tracker_tdee_history",
+              "name": "Weight",
+              "yaxis_id": "kg",
+              "type": "line",
+              "color": "#ff9800",
+              "data_generator": "return (entity.attributes.days || []).map(x => [new Date(x.day + 'T12:00:00').getTime(), x.weight_kg]);"
+            },
+            {
+              "entity": "sensor.calorie_tracker_tdee_history",
+              "name": "Intake",
+              "yaxis_id": "kcal",
+              "type": "column",
+              "color": "#78909c",
+              "data_generator": "return (entity.attributes.days || []).map(x => [new Date(x.day + 'T12:00:00').getTime(), x.calories]);"
+            }
+          ]
+        },
+        {
+          "type": "markdown",
+          "title": "Weekly averages and TDEE",
+          "content": "{% set weeks = state_attr('sensor.calorie_tracker_tdee_history', 'weeks') or [] %}\n| Week | Avg kg | Avg kcal | \u0394 kg | TDEE | Data |\n|---|---:|---:|---:|---:|---|\n{% for w in weeks | reverse %}\n| {{ w.week }} | {{ w.average_weight_kg | round(2) if w.average_weight_kg is not none else '\u2014' }} | {{ w.average_calories | round(0) if w.average_calories is not none else '\u2014' }} | {{ w.weight_change_kg | round(2) if w.weight_change_kg is not none else '\u2014' }} | {{ w.smoothed_tdee | round(0) }} | {{ w.weight_days }}/7 weight days, {{ w.calorie_days }}/7 intake days{% if not w.complete %}, in progress{% endif %} |\n{% endfor %}"
+        }
+      ]
+    }
+  ]
+}
