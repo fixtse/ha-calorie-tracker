@@ -21,7 +21,7 @@ def dashboard(prefix):
                   {"name": "TDEE", "data": "weeks", "modify": 'x.smoothed_tdee == null ? "—" : Math.round(x.smoothed_tdee)', "align": "right"},
                   {"name": "Weight days", "data": "weeks", "modify": 'x.weight_days + "/7"', "align": "right"},
                   {"name": "Intake days", "data": "weeks", "modify": 'x.calorie_days + "/7"', "align": "right"},
-                  {"name": "Status", "data": "weeks", "modify": '!x.complete ? "In progress" : x.eligible ? "Complete" : "Incomplete data"'},
+                  {"name": "Status", "data": "weeks", "modify": '!x.complete ? "In progress" : !x.eligible ? "Skipped" : x.calorie_days < 7 ? "Usable (partial)" : "Complete"'},
               ]}
     summary = """{% set phase = state_attr('ESTIMATE', 'status') %}
 {% set labels = {'disabled': 'Tracking disabled', 'waiting_for_body_stats': 'Waiting for starting weight and body fat', 'waiting_for_start_date': 'Waiting for the starting date', 'initial_estimate': 'Initial estimate (calibration in progress)', 'adaptive': 'Based on completed weight and intake weeks', 'invalid_targets': 'Adjust the weekly goal: no valid calorie or macro targets'} %}
@@ -29,7 +29,7 @@ def dashboard(prefix):
 
 **Calibrated weeks:** {{ state_attr('ESTIMATE', 'calibration_weeks') or 0 }}
 
-Positive weekly change means gain; negative means loss. Keep starting body stats fixed. Complete diary days are needed for calibration.
+Positive weekly change means gain; negative means loss. Keep starting body stats fixed. Log complete diary days; finished weeks need at least four logged days for calibration.
 
 {% set ranges = state_attr('ESTIMATE', 'ranges') %}
 {% if ranges %}**Macro ranges (g):** Protein {{ ranges.protein[0] | round }}–{{ ranges.protein[1] | round }}, fat {{ ranges.fat[0] | round }}–{{ ranges.fat[1] | round }}, carbs {{ ranges.carbohydrates[0] | round }}–{{ ranges.carbohydrates[1] | round }}.{% endif %}""".replace("ESTIMATE", estimate)

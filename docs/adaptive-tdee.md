@@ -72,13 +72,18 @@ to fat. The port preserves that allocation, and assigns the remaining calories t
 so the fat and carbohydrate targets match the workbook outputs.
 
 The spreadsheet forward-fills missing intake cells, including a reference to an unrelated
-cell for one first-day fallback. This port never invents food intake: a week needs **seven
-days with known diary calories** and at least one recorded weight to calibrate. A diary entry is
-assumed to represent real logged intake; ensure the whole day's food is logged. Missing
-weight weeks also break the adjacent-week comparison. Ineligible weeks stay visible, and
-cannot introduce fabricated zero-calorie days or shift the targets. Zero-calorie logged
-entries are distinct from missing entries. A day containing an entry with unknown calories
-also cannot calibrate the model. Today's partial week never changes measured TDEE.
+cell for one first-day fallback. This port never invents food intake: a completed week needs
+**at least four days with known diary calories** and at least one recorded weight to calibrate.
+Up to three missing calorie days are allowed. Average intake uses only those available days;
+missing days are neither counted as zero nor forward-filled. The weekly weight adjustment
+still divides by seven because the weight change spans a full week. Four or more missing
+calorie days make the week ineligible; the previous valid estimate remains in use.
+
+A diary entry is assumed to represent real logged intake; ensure the whole day's food is
+logged. Zero-calorie logged entries are distinct from missing entries. A day containing an
+entry with unknown calories counts as missing. A whole missing weight week still breaks
+the adjacent-week comparison. Ineligible weeks stay visible in the table alongside their
+coverage counts. Today's partial week never changes measured TDEE, even with four logged days.
 
 ## Recreate the Calculations dashboard
 

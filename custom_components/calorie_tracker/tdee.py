@@ -44,8 +44,8 @@ def calculate(settings, state, entries, today: str):
     """Return a reproducible estimate and bounded dashboard history, never invent intake.
 
     Weeks start at the configured starting date (not necessarily Monday). Within-week
-    weights carry forward as the sheet does. Intake requires seven logged days; missing
-    days and whole missing weight weeks cannot calibrate the model. The first week's
+    weights carry forward as the sheet does. Intake requires at least four logged days;
+    missing days stay absent and whole missing weight weeks cannot calibrate the model. The first week's
     estimate is shown but excluded from the adaptive average, matching AY28 onward.
     """
     weights = state.get("weights", {})
@@ -101,9 +101,10 @@ def calculate(settings, state, entries, today: str):
             days.append({"day": key, "weight_kg": measured, "calories": intake.get(key)})
         avg_weight = mean(week_weights) if observed_weights else None
         delta = avg_weight - previous_average if avg_weight is not None and previous_has_weights else None
-        eligible = complete and len(week_intake) == 7 and delta is not None
+        eligible = complete and len(week_intake) >= 4 and delta is not None
+        # Average only known intake days; weight change still spans a seven-day week.
         weekly_tdee = mean(week_intake) - delta * KCAL_PER_KG / 7 if eligible else None
-        # Positive estimates only. Incomplete/invalid weeks cannot change the targets.
+        # Positive estimates only. Ineligible/invalid weeks cannot change the targets.
         if weekly_tdee is not None and weekly_tdee <= 0:
             weekly_tdee = None
         if index > 0 and weekly_tdee is not None:

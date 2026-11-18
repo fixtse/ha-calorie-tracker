@@ -55,7 +55,7 @@
       },
       "tdee": {
         "title": "Adaptive TDEE and scale",
-        "description": "Optional Calculations-sheet model. Select your own BodyMiScale user, or a personal weight sensor. BodyMiScale handles identification on shared scales. Starting weight/body fat stay fixed; change the weekly goal any time. Missing calorie days do not calibrate TDEE. Automatic targets are a separate opt-in.",
+        "description": "Optional Calculations-sheet model. Select your own BodyMiScale user, or a personal weight sensor. BodyMiScale handles identification on shared scales. Starting weight/body fat stay fixed; change the weekly goal any time. Completed weeks with at least four logged calorie days calibrate TDEE; up to three days may be missing. Automatic targets are a separate opt-in.",
         "data": {
           "tdee_enabled": "Enable adaptive TDEE tracking",
           "tdee_auto_goals": "Automatically use calculated calorie and macro goals",

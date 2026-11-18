@@ -63,9 +63,9 @@ class TDEETest(unittest.TestCase):
         settings, state, entries = self.history()
         entries.pop(8)
         result = tdee.calculate(settings, state, entries, "2026-01-22")
-        self.assertEqual(result["summary"]["status"], "initial_estimate")
+        self.assertEqual(result["summary"]["status"], "adaptive")
         self.assertEqual(result["weeks"][1]["calorie_days"], 6)
-        self.assertIsNone(result["weeks"][1]["weekly_tdee"])
+        self.assertIsNotNone(result["weeks"][1]["weekly_tdee"])
         for day in list(state["weights"])[7:14]:
             del state["weights"][day]
         result = tdee.calculate(settings, state, entries, "2026-01-22")
@@ -88,7 +88,7 @@ class TDEETest(unittest.TestCase):
         for value, unit in (("unavailable", "kg"), ("unknown", "kg"), ("nan", "kg"), ("inf", "kg"), (-1, "kg"), (80, "unknown")):
             self.assertIsNone(tdee.kilograms(value, unit))
 
-    def test_logged_zero_is_valid_but_unknown_calories_do_not_calibrate(self):
+    def test_logged_zero_is_valid_and_unknown_calories_count_as_missing_days(self):
         settings, state, entries = self.history()
         entries[8]["nutrients"]["calories"] = 0
         result = tdee.calculate(settings, state, entries, "2026-01-22")
@@ -97,4 +97,42 @@ class TDEETest(unittest.TestCase):
         entries[8]["nutrients"]["calories"] = None
         result = tdee.calculate(settings, state, entries, "2026-01-22")
         self.assertEqual(result["weeks"][1]["calorie_days"], 6)
+        self.assertIsNotNone(result["weeks"][1]["weekly_tdee"])
+        for index in (9, 10, 11):
+            entries[index]["nutrients"]["calories"] = None
+        result = tdee.calculate(settings, state, entries, "2026-01-22")
+        self.assertEqual(result["weeks"][1]["calorie_days"], 3)
         self.assertIsNone(result["weeks"][1]["weekly_tdee"])
+
+    def test_up_to_three_missing_calorie_days_are_allowed(self):
+        for missing in range(8):
+            with self.subTest(missing=missing):
+                settings, state, entries = self.history()
+                absent = {entry["day"] for entry in entries[7:7 + missing]}
+                entries = [entry for entry in entries if entry["day"] not in absent]
+                result = tdee.calculate(settings, state, entries, "2026-01-22")
+                week = result["weeks"][1]
+                self.assertEqual(week["calorie_days"], 7 - missing)
+                self.assertEqual(week["eligible"], missing <= 3)
+                if missing <= 3:
+                    self.assertAlmostEqual(week["average_calories"], 2200)
+                    self.assertAlmostEqual(week["weekly_tdee"], 2200 + .2 * tdee.KCAL_PER_KG / 7)
+                    self.assertEqual(result["summary"]["status"], "adaptive")
+                else:
+                    self.assertIsNone(week["weekly_tdee"])
+                    self.assertEqual(result["summary"]["status"], "initial_estimate")
+
+    def test_four_available_days_use_their_mean_not_seven_day_zero_fill(self):
+        settings, state, entries = self.history()
+        entries = entries[:7] + entries[10:]
+        for entry, calories in zip(entries[7:11], (1800, 2000, 2400, 2600)):
+            entry["nutrients"]["calories"] = calories
+        week = tdee.calculate(settings, state, entries, "2026-01-22")["weeks"][1]
+        self.assertEqual(week["calorie_days"], 4)
+        self.assertAlmostEqual(week["average_calories"], 2200)
+        self.assertAlmostEqual(week["weekly_tdee"], 2200 + .2 * tdee.KCAL_PER_KG / 7)
+        # Four logged days in an unfinished week must still wait for the week boundary.
+        current = tdee.calculate(settings, state, entries, "2026-01-25")["weeks"][3]
+        self.assertEqual(current["calorie_days"], 4)
+        self.assertFalse(current["complete"])
+        self.assertFalse(current["eligible"])

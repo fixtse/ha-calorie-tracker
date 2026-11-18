@@ -30,7 +30,7 @@
         },
         {
           "type": "markdown",
-          "content": "{% set phase = state_attr('sensor.calorie_tracker_estimated_tdee', 'status') %}\n{% set labels = {'disabled': 'Tracking disabled', 'waiting_for_body_stats': 'Waiting for starting weight and body fat', 'waiting_for_start_date': 'Waiting for the starting date', 'initial_estimate': 'Initial estimate (calibration in progress)', 'adaptive': 'Based on completed weight and intake weeks', 'invalid_targets': 'Adjust the weekly goal: no valid calorie or macro targets'} %}\n**Phase:** {{ labels.get(phase, 'Measurements not available') }}\n\n**Calibrated weeks:** {{ state_attr('sensor.calorie_tracker_estimated_tdee', 'calibration_weeks') or 0 }}\n\nPositive weekly change means gain; negative means loss. Keep starting body stats fixed. Complete diary days are needed for calibration.\n\n{% set ranges = state_attr('sensor.calorie_tracker_estimated_tdee', 'ranges') %}\n{% if ranges %}**Macro ranges (g):** Protein {{ ranges.protein[0] | round }}\u2013{{ ranges.protein[1] | round }}, fat {{ ranges.fat[0] | round }}\u2013{{ ranges.fat[1] | round }}, carbs {{ ranges.carbohydrates[0] | round }}\u2013{{ ranges.carbohydrates[1] | round }}.{% endif %}"
+          "content": "{% set phase = state_attr('sensor.calorie_tracker_estimated_tdee', 'status') %}\n{% set labels = {'disabled': 'Tracking disabled', 'waiting_for_body_stats': 'Waiting for starting weight and body fat', 'waiting_for_start_date': 'Waiting for the starting date', 'initial_estimate': 'Initial estimate (calibration in progress)', 'adaptive': 'Based on completed weight and intake weeks', 'invalid_targets': 'Adjust the weekly goal: no valid calorie or macro targets'} %}\n**Phase:** {{ labels.get(phase, 'Measurements not available') }}\n\n**Calibrated weeks:** {{ state_attr('sensor.calorie_tracker_estimated_tdee', 'calibration_weeks') or 0 }}\n\nPositive weekly change means gain; negative means loss. Keep starting body stats fixed. Log complete diary days; finished weeks need at least four logged days for calibration.\n\n{% set ranges = state_attr('sensor.calorie_tracker_estimated_tdee', 'ranges') %}\n{% if ranges %}**Macro ranges (g):** Protein {{ ranges.protein[0] | round }}\u2013{{ ranges.protein[1] | round }}, fat {{ ranges.fat[0] | round }}\u2013{{ ranges.fat[1] | round }}, carbs {{ ranges.carbohydrates[0] | round }}\u2013{{ ranges.carbohydrates[1] | round }}.{% endif %}"
         },
         {
           "type": "custom:apexcharts-card",
@@ -133,7 +133,7 @@
             {
               "name": "Status",
               "data": "weeks",
-              "modify": "!x.complete ? \"In progress\" : x.eligible ? \"Complete\" : \"Incomplete data\""
+              "modify": "!x.complete ? \"In progress\" : !x.eligible ? \"Skipped\" : x.calorie_days < 7 ? \"Usable (partial)\" : \"Complete\""
             }
           ]
         }
